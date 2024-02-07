@@ -34,13 +34,13 @@ function HomeApp() {
 
 export default function Home() {
     const router = useRouter();
-    const [user, setUser] = useState<PublicUser | null | undefined>(null);
+    const [user, setUser] = useState<PublicUser | null | undefined>(undefined);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get("code");
         if (code != null) {
-            setUser(undefined);
+            setUser(null);
             fetch(`http://localhost:3001/login?code=${code}`, {
                 credentials: "include",
                 headers: {
@@ -56,7 +56,7 @@ export default function Home() {
                     setUser(user);
                 })
                 .catch((err) => {
-                    setUser(null);
+                    setUser(undefined);
                 });
         }
     }, []);
@@ -73,16 +73,12 @@ export default function Home() {
                 <h1>React Messenger</h1>
             </div>
 
-            {user === undefined && <Loading />}
+            {user === undefined && (
+                <HomeLogin onLoginButtonClicked={handleLoginButtonClicked} />
+            )}
             {user !== undefined && (
                 <UserContext.Provider value={user}>
-                    {user === null ? (
-                        <HomeLogin
-                            onLoginButtonClicked={handleLoginButtonClicked}
-                        />
-                    ) : (
-                        <HomeApp />
-                    )}
+                    <HomeApp />
                 </UserContext.Provider>
             )}
         </div>
