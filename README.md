@@ -10,7 +10,7 @@ Tech Stack:
 - Next.js (React)
 - Tailwind CSS
 
-#### (new TENT stack?)
+###### (new TENT stack?)
 
 ## Installing
 
