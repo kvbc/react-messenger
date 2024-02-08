@@ -1,6 +1,6 @@
 # react-messenger
 
-Simple messaging app built on a Next.js frontend with an Express backend, using Github authentication services (OAuth Apps).
+Simple messaging app built on a Next.js frontend with an Express backend and a SQLite database, using Github authentication services (OAuth Apps)
 
 This project was a great introduction to the world of third-party auth providers, as well as a huge help to familiarize myself with a simple potential login/logout user flow in a React application. Learned a lot of do's and dont's of access tokens. HttpOnly cookies for the win!
 
@@ -9,8 +9,9 @@ Tech Stack:
 - **E**xpress.js
 - **N**ext.js (React)
 - **T**ailwind CSS
+- **S**QLite
 
-###### (new TENT stack?)
+###### (new TENTS stack?)
 
 ## Installing
 
