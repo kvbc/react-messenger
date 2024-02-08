@@ -13,8 +13,8 @@ or
 
 There must exist an `.env` file in `backend/` with the following properties:
 - `PORT` - Backend server port
-- `CLIENT_ID` - Github OAuth app client ID
-- `CLIENT_SECRET` - Github OAuth app client secret
+- `CLIENT_ID` - Github OAuth app client ID (see [Resources](#Resources))
+- `CLIENT_SECRET` - Github OAuth app client secret (see [Resources](#Resources))
 
 ---
 
