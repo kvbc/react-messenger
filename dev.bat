@@ -1,5 +1,5 @@
 @ECHO OFF
-SET title = react-messenger
+SET title=react-messenger-cmd
 FOR %%d IN (frontend backend shared) DO START "%title%-%%d" /D %%d /MIN CMD /K START "" /MIN CMD /C "npm run dev"
 IF "%~1"=="/ob" START "" "http://localhost:3000"
 PAUSE
