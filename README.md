@@ -5,10 +5,10 @@ Simple messaging app built on a Next.js frontend with an Express backend, using 
 This project was a great introduction to the world of third-party auth providers, as well as a huge help to familiarize myself with a simple potential login/logout user flow in a React application. Learned a lot of do's and dont's of access tokens. HttpOnly cookies for the win!
 
 Tech Stack:
-- Typescript
-- Express.js
-- Next.js (React)
-- Tailwind CSS
+- **T**ypescript
+- **E**xpress.js
+- **N**ext.js (React)
+- **T**ailwind CSS
 
 ###### (new TENT stack?)
 
