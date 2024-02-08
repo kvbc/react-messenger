@@ -6,9 +6,11 @@ This project was a great introduction to the world of third-party auth providers
 
 Tech Stack:
 - Typescript
+- Express.js
 - Next.js (React)
 - Tailwind CSS
-- Express.js
+
+(TENT stack?)
 
 ## Installing
 
