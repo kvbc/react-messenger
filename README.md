@@ -1,5 +1,7 @@
 # react-messenger
 
+Simple messaging app built on a Next.js frontend with an Express backend, using Github services (OAuth Apps) for authentication.
+
 ## Installing
 
 1. Run `install.bat`
