@@ -23,7 +23,7 @@ There must exist an `.env` file in `backend/` with the following properties:
 or
 
 1. Run `npm run dev` in `backend/`, `frontend/` and `shared/`
-2. Open up `http://localhost:3000`
+2. Open up http://localhost:3000
 
 ## Resources
 
