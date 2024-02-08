@@ -2,6 +2,8 @@
 
 Simple messaging app built on a Next.js frontend with an Express backend, using Github services (OAuth Apps) for authentication.
 
+This project was a great introduction to the world of third-party auth providers, as well as a huge help to familiarize myself with a simple potential login/logout user flow in a React application. Learned a lot of do's and dont's with access tokens as well. HttpOnly cookies for the win!
+
 Tech Stack:
 - Typescript
 - Next.js (React)
