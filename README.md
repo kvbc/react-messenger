@@ -2,6 +2,12 @@
 
 Simple messaging app built on a Next.js frontend with an Express backend, using Github services (OAuth Apps) for authentication.
 
+Tech Stack:
+- Typescript
+- Next.js (React)
+- Tailwind CSS
+- Express.js
+
 ## Installing
 
 1. Run `install.bat`
