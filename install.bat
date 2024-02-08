@@ -1,0 +1,1 @@
+cd shared && npm run install-link && cd ../backend && npm run install-link && cd ../frontend && npm run install-link && cd ..
