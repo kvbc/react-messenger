@@ -1,1 +1,2 @@
-cd shared && npm run install-link && cd ../backend && npm run install-link && cd ../frontend && npm run install-link && cd ..
+@ECHO OFF
+FOR %%d IN (shared backend frontend) DO CD %%d & npm run install-link & CD ..
