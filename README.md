@@ -11,10 +11,12 @@ or
 
 ## Running / Development
 
+<details>
 There must exist a .env file in `backend/` with the following properties:
 - PORT - Backend server port
 - CLIENT_ID - Github OAuth app client ID
 - CLIENT_SECRET - Github OAuth app client secret
+</details>
 
 1. Run `dev.bat /ob`
 
