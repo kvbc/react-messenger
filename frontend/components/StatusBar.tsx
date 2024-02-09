@@ -12,7 +12,7 @@ export default function StatusBar({
 
     return (
         <div className="w-full">
-            {user == null ? (
+            {user.value == null ? (
                 <div className="flex justify-center items-center">
                     <Loading />
                 </div>
@@ -20,14 +20,14 @@ export default function StatusBar({
                 <div className="flex items-center h-full">
                     <div className="w-1/2 flex items-center gap-3">
                         <Image
-                            src={user.avatar_url}
+                            src={user.value.avatar_url}
                             alt="avatar"
                             width={64}
                             height={64}
                             className="rounded-full"
                         />
                         <div className="text-xl font-semibold">
-                            {user.login}
+                            {user.value.login}
                         </div>
                     </div>
                     <div className="w-1/2 flex justify-end h-full items-center">

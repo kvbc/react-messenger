@@ -1,5 +1,5 @@
 // https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-the-authenticated-user
-export type PrivateUser = {
+export type PrivateGithubUser = {
     login: string;
     id: number;
     node_id: string;
@@ -49,8 +49,8 @@ export type PrivateUser = {
     events_url: string;
     received_events_url: string;
 };
-export type PublicUser = Pick<
-    PrivateUser,
+export type PublicGithubUser = Pick<
+    PrivateGithubUser,
     | "login"
     | "id"
     | "node_id"
@@ -92,3 +92,11 @@ export type PublicUser = Pick<
     | "events_url"
     | "received_events_url"
 >;
+
+export type User = PublicGithubUser & {
+    friends: string[]; // github logins
+};
+
+export type BackendErrorResponse = {
+    message: string;
+};

@@ -5,7 +5,7 @@ import { FaGithub } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import { useContext, useEffect, useState } from "react";
 import { UserContext } from "@/contexts/UserContext";
-import { PublicUser } from "@react-messenger/shared";
+import { User } from "@react-messenger/shared";
 import Loading from "@/components/Loading";
 import FriendsList from "@/components/FriendsList";
 import Chatbox from "@/components/Chatbox";
@@ -37,11 +37,27 @@ function HomeApp({
 }) {
     const user = useContext(UserContext);
 
+    function handleAddFriendButtonClicked(friendLogin: string) {
+        fetch(`http://localhost:3001/addFriend?login=${friendLogin}`, {
+            credentials: "include",
+        }).then((res) => {
+            console.log(res.status);
+            if (res.status !== 200) throw "Status not OK";
+            user.set?.((user) =>
+                user === null || typeof user === "string"
+                    ? user
+                    : { ...user, friends: [...user.friends, friendLogin] }
+            );
+        });
+    }
+
     return (
         <>
             <StatusBar onLogoutButtonClicked={onLogoutButtonClicked} />
             <div className="w-full h-full flex gap-4">
-                <FriendsList />
+                <FriendsList
+                    onAddFriendButtonClicked={handleAddFriendButtonClicked}
+                />
                 <Chatbox />
             </div>
         </>
@@ -52,8 +68,8 @@ export default function Home() {
     const router = useRouter();
     // null - not loading
     // string - loading
-    // PulbicUser - loaded
-    const [user, setUser] = useState<PublicUser | string | null>(null);
+    // User - loaded
+    const [user, setUser] = useState<User | string | null>(null);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -90,9 +106,6 @@ export default function Home() {
         };
     }, []);
 
-    console.log(`User: ${user}`);
-    useEffect(() => {}, [user]);
-
     function handleLoginButtonClicked() {
         router.push("http://localhost:3001/login");
     }
@@ -116,7 +129,10 @@ export default function Home() {
                 <HomeLogin onLoginButtonClicked={handleLoginButtonClicked} />
             ) : (
                 <UserContext.Provider
-                    value={typeof user === "string" ? null : user}
+                    value={{
+                        value: typeof user === "string" ? null : user,
+                        set: setUser,
+                    }}
                 >
                     <HomeApp
                         onLogoutButtonClicked={handleLogoutButtonClicked}

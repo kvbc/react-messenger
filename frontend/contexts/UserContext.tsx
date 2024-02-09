@@ -1,4 +1,10 @@
-import { PublicUser } from "@react-messenger/shared";
-import { createContext } from "react";
+import { User } from "@react-messenger/shared";
+import { Dispatch, SetStateAction, createContext } from "react";
 
-export const UserContext = createContext<PublicUser | null>(null);
+export const UserContext = createContext<{
+    value: User | null;
+    set: Dispatch<SetStateAction<User | string | null>> | null;
+}>({
+    value: null,
+    set: null,
+});
