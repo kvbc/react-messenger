@@ -95,8 +95,9 @@ export type PublicGithubUser = Pick<
 
 export type User = PublicGithubUser & {
     friends: string[]; // github logins
+    friendInvitations: string[]; // github logins
 };
 
 export type BackendErrorResponse = {
-    message: string;
+    message: string | null;
 };

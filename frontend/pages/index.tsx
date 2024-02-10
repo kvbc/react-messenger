@@ -37,18 +37,37 @@ function HomeApp({
 }) {
     const user = useContext(UserContext);
 
-    function handleAddFriendButtonClicked(friendLogin: string) {
-        fetch(`http://localhost:3001/addFriend?login=${friendLogin}`, {
+    function handleInviteFriendButtonClicked(friendLogin: string) {
+        fetch(`http://localhost:3001/inviteFriend?login=${friendLogin}`, {
             credentials: "include",
-        }).then((res) => {
-            console.log(res.status);
-            if (res.status !== 200) throw "Status not OK";
-            user.set?.((user) =>
-                user === null || typeof user === "string"
-                    ? user
-                    : { ...user, friends: [...user.friends, friendLogin] }
-            );
         });
+        // .then((res) => {
+        //     console.log(res.status);
+        //     if (res.status !== 200) throw "Status not OK";
+        //     user.set?.((user) =>
+        //         user === null || typeof user === "string"
+        //             ? user
+        //             : { ...user, friends: [...user.friends, friendLogin] }
+        //     );
+        // });
+    }
+
+    function handleAcceptFriendInviteButtonClicked(inviterLogin: string) {
+        fetch(
+            `http://localhost:3001/acceptFriendInvite?login=${inviterLogin}`,
+            {
+                credentials: "include",
+            }
+        );
+    }
+
+    function handleRejectFriendInviteButtonClicked(inviterLogin: string) {
+        fetch(
+            `http://localhost:3001/rejectFriendInvite?login=${inviterLogin}`,
+            {
+                credentials: "include",
+            }
+        );
     }
 
     return (
@@ -56,7 +75,15 @@ function HomeApp({
             <StatusBar onLogoutButtonClicked={onLogoutButtonClicked} />
             <div className="w-full h-full flex gap-4">
                 <FriendsList
-                    onAddFriendButtonClicked={handleAddFriendButtonClicked}
+                    onInviteFriendButtonClicked={
+                        handleInviteFriendButtonClicked
+                    }
+                    onAcceptFriendInviteButtonClicked={
+                        handleAcceptFriendInviteButtonClicked
+                    }
+                    onRejectFriendInviteButtonClicked={
+                        handleRejectFriendInviteButtonClicked
+                    }
                 />
                 <Chatbox />
             </div>
@@ -70,41 +97,54 @@ export default function Home() {
     // string - loading
     // User - loaded
     const [user, setUser] = useState<User | string | null>(null);
+    const [code, setCode] = useState<string | null>(null);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get("code");
-        const fetchID = String(Math.random());
-        setUser(fetchID);
-        const controller = new AbortController();
-        fetch(
-            `http://localhost:3001/login` +
-                (code != null ? `?code=${code}` : "?noRedirect=true"),
-            {
-                credentials: "include",
-                headers: {
-                    Accept: "application/json",
-                },
-                signal: controller.signal,
-            }
-        )
-            .then((res) => {
-                console.log(`Login status ${res.status}`);
-                if (res.status !== 200) throw "Status not OK";
-                return res.json();
-            })
-            .then((data) => {
-                setUser(data.user);
-            })
-            .catch((err) => {
-                console.error(err);
-                setUser((user) => (user === fetchID ? null : user));
-            });
-        return () => {
-            setUser((user) => (user === fetchID ? null : user));
-            controller.abort();
-        };
+        setCode(urlParams.get("code"));
     }, []);
+
+    useEffect(() => {
+        setUser(code);
+    }, [code]);
+
+    useEffect(() => {
+        if (typeof user === null) {
+            const fetchID = String(Math.random());
+            setUser(fetchID);
+        } else if (typeof user === "string") {
+            const fetchID = user;
+            const controller = new AbortController();
+            fetch(
+                `http://localhost:3001/login` +
+                    (code != null ? `?code=${code}` : "?noRedirect=true"),
+                {
+                    credentials: "include",
+                    headers: {
+                        Accept: "application/json",
+                    },
+                    signal: controller.signal,
+                }
+            )
+                .then((res) => {
+                    console.log(`Login status ${res.status}`);
+                    if (res.status !== 200) throw "Status not OK";
+                    return res.json();
+                })
+                .then((data) => {
+                    setUser(data.user);
+                })
+                .catch((err) => {
+                    console.error(err);
+                    console.log("ERRORD");
+                    setUser((user) => (user === fetchID ? null : user));
+                });
+            return () => {
+                // setUser((user) => (user === fetchID ? null : user));
+                controller.abort();
+            };
+        }
+    }, [user, code]);
 
     function handleLoginButtonClicked() {
         router.push("http://localhost:3001/login");

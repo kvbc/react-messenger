@@ -2,19 +2,19 @@ import { configDotenv } from "dotenv";
 import express, { Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import sqlite3 from "sqlite3";
+import sqlite3, { Database } from "sqlite3";
 import {
     BackendErrorResponse,
     PublicGithubUser,
     User,
 } from "@react-messenger/shared";
 
+sqlite3.verbose();
+
 configDotenv();
 const PORT = parseInt(process.env.PORT!);
 const CLIENT_ID = process.env.CLIENT_ID!;
 const CLIENT_SECRET = process.env.CLIENT_SECRET!;
-
-// let handledCodes: string[] = [];
 
 // const db = new sqlite3.Database("db.db");
 const db = new sqlite3.Database(":memory:");
@@ -33,6 +33,14 @@ db.serialize(() => {
             UNIQUE(friend_login, friends_with_login)
         )
     `);
+    db.run(`
+        CREATE TABLE IF NOT EXISTS FriendInvitations(
+            id INT AUTO_INCREMENT PRIMARY KEY UNIQUE,
+            inviter_login TEXT NOT NULL,
+            invitee_login TEXT NOT NULL,
+            UNIQUE(inviter_login, invitee_login)
+        )
+    `);
 });
 
 type UsersRow = { login: string; access_token: string };
@@ -40,6 +48,11 @@ type FriendsRow = {
     id: number;
     friend_login: string;
     friends_with_login: string;
+};
+type FriendInvitationsRow = {
+    id: number;
+    inviter_login: string;
+    invitee_login: string;
 };
 
 const app = express();
@@ -52,9 +65,44 @@ app.use(
 );
 app.use(cookieParser());
 
-app.get("/addFriend", (req, res) => {
-    const addFriendLogin = req.query.login;
-    if (typeof addFriendLogin !== "string")
+app.get("/acceptFriendInvite", (req, res) => {
+    const inviterLogin = req.query.login;
+    if (typeof inviterLogin !== "string")
+        return resError(res, 500, "Missing login query");
+
+    const accessToken = req.cookies.accessToken;
+    if (typeof accessToken !== "string")
+        return resError(res, 500, "Missing access token");
+
+    console.log(`accept mr. ${inviterLogin}`);
+
+    db.get(
+        "SELECT login FROM Users WHERE access_token = ?",
+        [accessToken],
+        function (err, row: UsersRow) {
+            if (err) return resError(res, 500);
+            db.run(
+                "DELETE FROM FriendInvitations WHERE inviter_login = ? AND invitee_login = ?",
+                [inviterLogin, row.login],
+                function (err) {
+                    if (err) return resError(res, 500, "No invite");
+                    db.run(
+                        "INSERT INTO Friends(id, friend_login, friends_with_login) VALUES(NULL, ?, ?)",
+                        [row.login, inviterLogin],
+                        function (err) {
+                            if (err) return resError(res, 500);
+                            res.status(200).send();
+                        }
+                    );
+                }
+            );
+        }
+    );
+});
+
+app.get("/rejectFriendInvite", (req, res) => {
+    const inviterLogin = req.query.login;
+    if (typeof inviterLogin !== "string")
         return resError(res, 500, "Missing login query");
 
     const accessToken = req.cookies.accessToken;
@@ -62,20 +110,46 @@ app.get("/addFriend", (req, res) => {
         return resError(res, 500, "Missing access token");
 
     db.get(
-        "SELECT * FROM Users WHERE access_token = ?",
+        "SELECT login FROM Users WHERE access_token = ?",
         [accessToken],
         function (err, row: UsersRow) {
             if (err) return resError(res, 500);
-            if (addFriendLogin === row.login)
-                return resError(res, 500, "Cannot add yourself as a friend");
             db.run(
-                "INSERT OR IGNORE INTO Friends(id, friend_login, friends_with_login) VALUES(NULL, ?, ?)",
-                [addFriendLogin, row.login],
+                "DELETE FROM FriendInvitations WHERE inviter_login = ? AND invitee_login = ?",
+                [inviterLogin, row.login],
+                function (err) {
+                    if (err) return resError(res, 500, "No invite");
+                    res.status(200).send();
+                }
+            );
+        }
+    );
+});
+
+app.get("/inviteFriend", (req, res) => {
+    const inviteeLogin = req.query.login;
+    if (typeof inviteeLogin !== "string")
+        return resError(res, 500, "Missing login query");
+
+    const accessToken = req.cookies.accessToken;
+    if (typeof accessToken !== "string")
+        return resError(res, 500, "Missing access token");
+
+    db.get(
+        "SELECT login FROM Users WHERE access_token = ?",
+        [accessToken],
+        function (err, row: UsersRow) {
+            if (err) return resError(res, 500);
+            if (inviteeLogin === row.login)
+                return resError(res, 500, "Cannot invite yourself as a friend");
+            db.run(
+                "INSERT OR IGNORE INTO FriendInvitations(id, inviter_login, invitee_login) VALUES(NULL, ?, ?)",
+                [row.login, inviteeLogin],
                 function (err) {
                     if (err) return resError(res, 500);
                     if (this.changes === 0)
                         // (query ignored)
-                        return resError(res, 500, "Friend already exists");
+                        return resError(res, 500, "Friend already invited");
                     return res.status(200).send();
                 }
             );
@@ -87,7 +161,7 @@ app.get("/logout", (req, res) => {
     res.status(200)
         .setHeader(
             "Set-Cookie",
-            `accessToken=deleted; Path=/; Max-Age=0; HttpOnly; SameSite=None`
+            `accessToken=deleted; Path=/; Max-Age=0; HttpOnly` //; SameSite=None`
         )
         .send();
 });
@@ -95,9 +169,17 @@ app.get("/logout", (req, res) => {
 app.get("/login", (req, res) => {
     function returnUser(accessToken: string) {
         fetchGithubUserFromAccessToken(accessToken).then(
-            (ghUser: PublicGithubUser) => {
+            (ghUser: PublicGithubUser | null) => {
+                if (ghUser === null)
+                    return resError(
+                        res,
+                        500,
+                        "Could not fetch user from access token"
+                    );
+
                 let user: User = ghUser as User;
                 user.friends = [];
+                user.friendInvitations = [];
 
                 db.run(
                     "INSERT OR IGNORE INTO Users(login, access_token) VALUES(?, ?)",
@@ -110,23 +192,46 @@ app.get("/login", (req, res) => {
                 ]);
 
                 db.all(
-                    "SELECT friend_login FROM Friends WHERE friends_with_login = ?",
+                    "SELECT inviter_login FROM FriendInvitations WHERE invitee_login = ?",
                     [user.login],
-                    function (err, rows: FriendsRow[]) {
-                        if (err) {
-                            console.error(err);
-                            return res.status(500).send();
-                        }
+                    function (err: Error | null, rows: FriendInvitationsRow[]) {
+                        if (err) return resError(res, 500);
                         rows.forEach((row) => {
-                            console.log(`add friend: ${row.friend_login}`);
-                            user.friends.push(row.friend_login);
+                            console.log(`invite from: ${row.inviter_login}`);
+                            user.friendInvitations.push(row.inviter_login);
                         });
-                        res.status(200)
-                            .setHeader(
-                                "Set-Cookie",
-                                `accessToken=${accessToken}; Path=/; HttpOnly; SameSite=None`
-                            )
-                            .json({ user });
+                        db.all(
+                            "SELECT friend_login FROM Friends WHERE friends_with_login = ?",
+                            [user.login],
+                            function (err, rows: FriendsRow[]) {
+                                if (err) return resError(res, 500);
+                                rows.forEach((row) => {
+                                    console.log(`friend: ${row.friend_login}`);
+                                    user.friends.push(row.friend_login);
+                                });
+                                db.all(
+                                    "SELECT friends_with_login FROM Friends WHERE friend_login = ?",
+                                    [user.login],
+                                    function (err, rows: FriendsRow[]) {
+                                        if (err) return resError(res, 500);
+                                        rows.forEach((row) => {
+                                            console.log(
+                                                `friend: ${row.friends_with_login}`
+                                            );
+                                            user.friends.push(
+                                                row.friends_with_login
+                                            );
+                                        });
+                                        res.status(200)
+                                            .setHeader(
+                                                "Set-Cookie",
+                                                `accessToken=${accessToken}; Path=/; HttpOnly` //; SameSite=None`
+                                            )
+                                            .json({ user });
+                                    }
+                                );
+                            }
+                        );
                     }
                 );
             }
@@ -168,11 +273,13 @@ app.get("/login", (req, res) => {
             }
         )
             .then((pRes) => {
+                // console.log(`>>> ${pRes.status} ${pRes.statusText}`);
                 if (pRes.status !== 200)
                     throw "Status not OK (fetch access token)";
                 return pRes.json();
             })
             .then((data) => {
+                // console.log(`>>>> `, data);
                 returnUser(data.access_token);
             })
             .catch((err) => res.status(500).send());
@@ -183,27 +290,48 @@ app.listen(PORT, () => {
     console.log(`Listening on port ${PORT}`);
 });
 
+// type ExtractMethodNames<T> = { [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never }[keyof T];
+// type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
+
+// type OnlyClassMethods<T> = {
+//     [K in keyof T]: T[K] extends (...args: any) => any ? K : never
+// }[keyof T]
+
+// function dbPromise<T>(dbFunc: (...params: any, callback: Function) => sqlite3.Database, ...params: any, callback: Function): Promise<T> {
+//     return new Promise((resolve, reject) => {
+//         dbFunc(params, function(...args: any) {
+//             let res = callback(args);
+//             if(res === null)
+//                 reject()
+//             else
+//                 resolve(res)
+//         })
+//     })
+// }
+
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 function resError(
     res: Response,
     statusCode: number,
     message: string | null = null
-) {
+): null {
     const json: BackendErrorResponse = { message };
     console.error(`[Error ${statusCode}] ${message}`);
     res.status(statusCode).json(json);
+    return null;
 }
 
 function fetchGithubUserFromAccessToken(
     accessToken: string
-): Promise<PublicGithubUser> {
+): Promise<PublicGithubUser | null> {
     return fetch(`https://api.github.com/user`, {
         headers: {
             Accept: "application/vnd.github+json",
             Authorization: `Bearer ${accessToken}`,
         },
     }).then((pRes) => {
-        if (pRes.status !== 200) throw "Could not fetch user from access token";
+        console.log(pRes.status, pRes.statusText, accessToken);
+        if (pRes.status !== 200) return null;
         return pRes.json();
     });
 }
