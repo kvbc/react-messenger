@@ -13,6 +13,9 @@ Tech Stack:
 
 ###### (new TENTS stack?)
 
+Lessons learned:
+- Should have used React Query 😅
+
 ## Installing
 
 1. Run `install.bat`
