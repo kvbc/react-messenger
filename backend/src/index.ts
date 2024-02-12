@@ -8,6 +8,7 @@ import {
     PublicGithubUser,
     User,
 } from "@react-messenger/shared";
+import { WebSocketServer } from "ws";
 
 sqlite3.verbose();
 
@@ -54,6 +55,28 @@ type FriendInvitationsRow = {
     inviter_login: string;
     invitee_login: string;
 };
+
+//
+
+// const wss = new WebSocketServer({ port: 8000 });
+
+// wss.on("connection", (ws, req) => {
+//     console.log("[WS] new connection");
+
+//     console.log(req.headers);
+
+//     ws.on("error", (err) => console.error(`[WS] ${err}`));
+
+//     ws.send(
+//         JSON.stringify({
+//             hellow: "everyone!",
+//             is: "this",
+//             working: "or not?",
+//         })
+//     );
+// });
+
+//
 
 const app = express();
 app.use(

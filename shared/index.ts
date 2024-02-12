@@ -101,3 +101,17 @@ export type User = PublicGithubUser & {
 export type BackendErrorResponse = {
     message: string | null;
 };
+
+export type WebsocketMessage =
+    | {
+          event: "invited_by";
+          login: string; // login
+      }
+    | {
+          event: "rejected_by";
+          login: string; // login
+      }
+    | {
+          event: "accepted_by";
+          login: string;
+      };

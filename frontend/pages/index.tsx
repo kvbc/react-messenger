@@ -5,11 +5,12 @@ import { FaGithub } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import { useContext, useEffect, useState } from "react";
 import { UserContext } from "@/contexts/UserContext";
-import { User } from "@react-messenger/shared";
+import { User, WebsocketMessage } from "@react-messenger/shared";
 import Loading from "@/components/Loading";
 import FriendsList from "@/components/FriendsList";
 import Chatbox from "@/components/Chatbox";
 import StatusBar from "@/components/StatusBar";
+import useWebSocket from "react-use-websocket";
 
 function HomeLogin({
     onLoginButtonClicked,
@@ -36,6 +37,43 @@ function HomeApp({
     onLogoutButtonClicked: () => void;
 }) {
     const user = useContext(UserContext);
+    // const ws = useWebSocket<WebsocketMessage>("ws://localhost:8000");
+
+    // useEffect(() => {
+    //     const msg = ws.lastJsonMessage;
+    //     if (msg == null) return;
+    //     switch (msg.event) {
+    //         case "accepted_by":
+    //             user.set?.((user) =>
+    //                 user === null || typeof user === "string"
+    //                     ? user
+    //                     : { ...user, friends: [...user.friends, msg.login] }
+    //             );
+    //             break;
+    //         case "invited_by":
+    //             user.set?.((user) =>
+    //                 user === null || typeof user === "string"
+    //                     ? user
+    //                     : {
+    //                           ...user,
+    //                           friendInvitations: [...user.friends, msg.login],
+    //                       }
+    //             );
+    //             break;
+    //         case "rejected_by":
+    //             user.set?.((user) =>
+    //                 user === null || typeof user === "string"
+    //                     ? user
+    //                     : {
+    //                           ...user,
+    //                           friendInvitations: user.friendInvitations.filter(
+    //                               (inviterLogin) => inviterLogin !== user.login
+    //                           ),
+    //                       }
+    //             );
+    //             break;
+    //     }
+    // }, [user, ws.lastJsonMessage]);
 
     function handleInviteFriendButtonClicked(friendLogin: string) {
         fetch(`http://localhost:3001/inviteFriend?login=${friendLogin}`, {
