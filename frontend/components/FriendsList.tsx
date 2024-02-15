@@ -10,10 +10,12 @@ export default function FriendsList({
     onInviteFriendButtonClicked,
     onAcceptFriendInviteButtonClicked,
     onRejectFriendInviteButtonClicked,
+    onCancelFriendInviteButtonClicked,
 }: {
-    onInviteFriendButtonClicked: (friendLogin: string) => void;
+    onInviteFriendButtonClicked: (inviteeLogin: string) => void;
     onAcceptFriendInviteButtonClicked: (inviterLogin: string) => void;
     onRejectFriendInviteButtonClicked: (inviterLogin: string) => void;
+    onCancelFriendInviteButtonClicked: (inviteeLogin: string) => void;
 }) {
     const user = useContext(UserContext);
     const inviteFriendLoginRef = useRef<HTMLInputElement>(null);
@@ -46,6 +48,47 @@ export default function FriendsList({
                                 className="w-1/2 bg-blue-950 rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                             />
                         </button>
+                        {user.value.pendingFriendInvites.length > 0 && (
+                            <div className="flex w-full justify-center items-center gap-3 text-slate-500 ">
+                                <hr className="w-1/3 border-slate-500" />
+                                Pending
+                                <hr className="w-1/3 border-slate-500" />
+                            </div>
+                        )}
+                        {user.value.pendingFriendInvites.map((inviteeLogin) => (
+                            <div
+                                key={inviteeLogin}
+                                className="bg-slate-700 flex items-center gap-3 overflow-hidden p-2"
+                            >
+                                <div className="flex items-center gap-3 w-1/2">
+                                    <Link
+                                        href={`https://github.com/${inviteeLogin}`}
+                                        target="_blank"
+                                    >
+                                        <Image
+                                            src={`https://github.com/${inviteeLogin}.png`}
+                                            alt={inviteeLogin}
+                                            width={48}
+                                            height={48}
+                                        />
+                                    </Link>
+                                    {inviteeLogin}
+                                </div>
+                                <div className="w-1/2 flex justify-end items-center gap-3">
+                                    <button
+                                        title="Cancel"
+                                        className="group"
+                                        onClick={() =>
+                                            onCancelFriendInviteButtonClicked(
+                                                inviteeLogin
+                                            )
+                                        }
+                                    >
+                                        <IoCloseCircle className="text-2xl text-red-400 group-hover:text-4xl transition-all duration-300" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
                         {user.value.friendInvitations.length > 0 && (
                             <div className="flex w-full justify-center items-center gap-3 text-slate-500 ">
                                 <hr className="w-1/3 border-slate-500" />
@@ -96,13 +139,15 @@ export default function FriendsList({
                                 </div>
                             </div>
                         ))}
-                        {user.value.friendInvitations.length > 0 && (
-                            <div className="flex w-full justify-center items-center gap-3 text-slate-500 ">
-                                <hr className="w-1/3 border-slate-500" />
-                                Friends
-                                <hr className="w-1/3 border-slate-500" />
-                            </div>
-                        )}
+                        {user.value.friends.length > 0 &&
+                            (user.value.friendInvitations.length > 0 ||
+                                user.value.pendingFriendInvites.length > 0) && (
+                                <div className="flex w-full justify-center items-center gap-3 text-slate-500 ">
+                                    <hr className="w-1/3 border-slate-500" />
+                                    Friends
+                                    <hr className="w-1/3 border-slate-500" />
+                                </div>
+                            )}
                         {user.value.friends.map((friendLogin) => (
                             <div
                                 key={friendLogin}

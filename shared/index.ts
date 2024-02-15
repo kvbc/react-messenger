@@ -96,22 +96,21 @@ export type PublicGithubUser = Pick<
 export type User = PublicGithubUser & {
     friends: string[]; // github logins
     friendInvitations: string[]; // github logins
+    pendingFriendInvites: string[]; // github logins
 };
 
 export type BackendErrorResponse = {
     message: string | null;
 };
-
-export type WebsocketMessage =
-    | {
-          event: "invited_by";
-          login: string; // login
-      }
-    | {
-          event: "rejected_by";
-          login: string; // login
-      }
-    | {
-          event: "accepted_by";
-          login: string;
-      };
+export type WebsocketMessage = {
+    event:
+        | "invited"
+        | "invited_by"
+        | "rejected_by"
+        | "accepted_by"
+        | "accepted"
+        | "rejected"
+        | "canceled"
+        | "canceled_by";
+    login: string; // github login
+};

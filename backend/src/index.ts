@@ -3,19 +3,21 @@ import express, { Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import sqlite3, { Database } from "sqlite3";
+import cookie from "cookie";
 import {
     BackendErrorResponse,
     PublicGithubUser,
     User,
+    WebsocketMessage,
 } from "@react-messenger/shared";
-import { WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 
 sqlite3.verbose();
 
 configDotenv();
-const PORT = parseInt(process.env.PORT!);
-const CLIENT_ID = process.env.CLIENT_ID!;
-const CLIENT_SECRET = process.env.CLIENT_SECRET!;
+const PORT: number = parseInt(process.env.PORT!);
+const CLIENT_ID: string = process.env.CLIENT_ID!;
+const CLIENT_SECRET: string = process.env.CLIENT_SECRET!;
 
 // const db = new sqlite3.Database("db.db");
 const db = new sqlite3.Database(":memory:");
@@ -58,23 +60,24 @@ type FriendInvitationsRow = {
 
 //
 
-// const wss = new WebSocketServer({ port: 8000 });
+const wss = new WebSocketServer({ port: 8000 });
+const wsConnections: { [accessToken: string]: WebSocket | undefined } = {};
+wss.on("connection", (ws, req) => {
+    console.log("[WS] new connection");
 
-// wss.on("connection", (ws, req) => {
-//     console.log("[WS] new connection");
+    ws.onerror = console.error;
 
-//     console.log(req.headers);
+    if (req.headers.cookie == null) return ws.close();
 
-//     ws.on("error", (err) => console.error(`[WS] ${err}`));
+    const cookies = cookie.parse(req.headers.cookie);
+    const accessToken: string | undefined = cookies.accessToken;
+    if (!accessToken) return ws.close();
 
-//     ws.send(
-//         JSON.stringify({
-//             hellow: "everyone!",
-//             is: "this",
-//             working: "or not?",
-//         })
-//     );
-// });
+    wsConnections[accessToken] = ws;
+    ws.onclose = () => {
+        delete wsConnections[accessToken];
+    };
+});
 
 //
 
@@ -102,19 +105,50 @@ app.get("/acceptFriendInvite", (req, res) => {
     db.get(
         "SELECT login FROM Users WHERE access_token = ?",
         [accessToken],
-        function (err, row: UsersRow) {
+        function (err, inviteeRow: UsersRow) {
             if (err) return resError(res, 500);
             db.run(
                 "DELETE FROM FriendInvitations WHERE inviter_login = ? AND invitee_login = ?",
-                [inviterLogin, row.login],
+                [inviterLogin, inviteeRow.login],
                 function (err) {
                     if (err) return resError(res, 500, "No invite");
                     db.run(
                         "INSERT INTO Friends(id, friend_login, friends_with_login) VALUES(NULL, ?, ?)",
-                        [row.login, inviterLogin],
+                        [inviteeRow.login, inviterLogin],
                         function (err) {
                             if (err) return resError(res, 500);
                             res.status(200).send();
+
+                            db.get(
+                                "SELECT access_token FROM Users WHERE login = ?",
+                                [inviterLogin],
+                                function (err, inviterRow: UsersRow) {
+                                    if (err) return;
+                                    // send to invitee
+                                    {
+                                        const ws = wsConnections[accessToken];
+                                        if (!ws) return;
+                                        const msg: WebsocketMessage = {
+                                            event: "accepted",
+                                            login: inviterLogin,
+                                        };
+                                        ws.send(JSON.stringify(msg));
+                                    }
+                                    // send to inviter
+                                    {
+                                        const ws =
+                                            wsConnections[
+                                                inviterRow.access_token
+                                            ];
+                                        if (!ws) return;
+                                        const msg: WebsocketMessage = {
+                                            event: "accepted_by",
+                                            login: inviteeRow.login,
+                                        };
+                                        ws.send(JSON.stringify(msg));
+                                    }
+                                }
+                            );
                         }
                     );
                 }
@@ -135,14 +169,100 @@ app.get("/rejectFriendInvite", (req, res) => {
     db.get(
         "SELECT login FROM Users WHERE access_token = ?",
         [accessToken],
-        function (err, row: UsersRow) {
+        function (err, inviteeRow: UsersRow) {
             if (err) return resError(res, 500);
             db.run(
                 "DELETE FROM FriendInvitations WHERE inviter_login = ? AND invitee_login = ?",
-                [inviterLogin, row.login],
+                [inviterLogin, inviteeRow.login],
                 function (err) {
                     if (err) return resError(res, 500, "No invite");
                     res.status(200).send();
+
+                    db.get(
+                        "SELECT access_token FROM Users WHERE login = ?",
+                        [inviterLogin],
+                        function (err, inviterRow: UsersRow) {
+                            if (err) return;
+                            // send to invitee
+                            {
+                                const ws = wsConnections[accessToken];
+                                if (!ws) return;
+                                const msg: WebsocketMessage = {
+                                    event: "rejected",
+                                    login: inviterLogin,
+                                };
+                                ws.send(JSON.stringify(msg));
+                            }
+                            // send to inviter
+                            {
+                                const ws =
+                                    wsConnections[inviterRow.access_token];
+                                if (!ws) return;
+                                const msg: WebsocketMessage = {
+                                    event: "rejected_by",
+                                    login: inviteeRow.login,
+                                };
+                                ws.send(JSON.stringify(msg));
+                            }
+                        }
+                    );
+                }
+            );
+        }
+    );
+});
+
+app.get("/cancelFriendInvite", (req, res) => {
+    const inviteeLogin = req.query.login;
+    if (typeof inviteeLogin !== "string")
+        return resError(res, 500, "Missing login query");
+
+    const accessToken = req.cookies.accessToken;
+    if (typeof accessToken !== "string")
+        return resError(res, 500, "Missing access token");
+
+    db.get(
+        "SELECT login FROM Users WHERE access_token = ?",
+        [accessToken],
+        function (err, { login: inviterLogin }: { login: string }) {
+            if (err) return resError(res, 500);
+            db.run(
+                "DELETE FROM FriendInvitations WHERE invitee_login = ? AND inviter_login = ?",
+                [inviteeLogin, inviterLogin],
+                function (err) {
+                    if (err) return resError(res, 500);
+                    res.status(200).send();
+
+                    // send to invitee
+                    db.get(
+                        "SELECT access_token FROM Users WHERE login = ?",
+                        [inviteeLogin],
+                        function (
+                            err,
+                            {
+                                access_token: inviteeAccessToken,
+                            }: { access_token: string }
+                        ) {
+                            if (err) return;
+                            const ws = wsConnections[inviteeAccessToken];
+                            if (!ws) return;
+                            const msg: WebsocketMessage = {
+                                event: "canceled_by",
+                                login: inviterLogin,
+                            };
+                            ws.send(JSON.stringify(msg));
+                        }
+                    );
+                    // send to inviter
+                    {
+                        const ws = wsConnections[accessToken];
+                        if (!ws) return;
+                        const msg: WebsocketMessage = {
+                            event: "canceled",
+                            login: inviteeLogin,
+                        };
+                        ws.send(JSON.stringify(msg));
+                    }
                 }
             );
         }
@@ -161,19 +281,48 @@ app.get("/inviteFriend", (req, res) => {
     db.get(
         "SELECT login FROM Users WHERE access_token = ?",
         [accessToken],
-        function (err, row: UsersRow) {
+        function (err, inviterRow: UsersRow) {
             if (err) return resError(res, 500);
-            if (inviteeLogin === row.login)
+            if (inviteeLogin === inviterRow.login)
                 return resError(res, 500, "Cannot invite yourself as a friend");
             db.run(
                 "INSERT OR IGNORE INTO FriendInvitations(id, inviter_login, invitee_login) VALUES(NULL, ?, ?)",
-                [row.login, inviteeLogin],
+                [inviterRow.login, inviteeLogin],
                 function (err) {
                     if (err) return resError(res, 500);
                     if (this.changes === 0)
                         // (query ignored)
                         return resError(res, 500, "Friend already invited");
-                    return res.status(200).send();
+                    res.status(200).send();
+
+                    db.get(
+                        "SELECT access_token FROM Users WHERE login = ?",
+                        [inviteeLogin],
+                        function (err, inviteeRow: UsersRow) {
+                            if (err) return;
+                            // send to inviter
+                            {
+                                const ws = wsConnections[accessToken];
+                                if (!ws) return;
+                                const msg: WebsocketMessage = {
+                                    event: "invited",
+                                    login: inviteeLogin,
+                                };
+                                ws.send(JSON.stringify(msg));
+                            }
+                            // send to invitee
+                            {
+                                const ws =
+                                    wsConnections[inviteeRow.access_token];
+                                if (!ws) return;
+                                const msg: WebsocketMessage = {
+                                    event: "invited_by",
+                                    login: inviterRow.login,
+                                };
+                                ws.send(JSON.stringify(msg));
+                            }
+                        }
+                    );
                 }
             );
         }
@@ -203,6 +352,7 @@ app.get("/login", (req, res) => {
                 let user: User = ghUser as User;
                 user.friends = [];
                 user.friendInvitations = [];
+                user.pendingFriendInvites = [];
 
                 db.run(
                     "INSERT OR IGNORE INTO Users(login, access_token) VALUES(?, ?)",
@@ -213,6 +363,17 @@ app.get("/login", (req, res) => {
                     accessToken,
                     user.login,
                 ]);
+
+                db.all(
+                    "SELECT invitee_login FROM FriendInvitations WHERE inviter_login = ?",
+                    [user.login],
+                    function (err, rows: { invitee_login: string }[]) {
+                        if (err) return resError(res, 500);
+                        rows.forEach((row) => {
+                            user.pendingFriendInvites.push(row.invitee_login);
+                        });
+                    }
+                );
 
                 db.all(
                     "SELECT inviter_login FROM FriendInvitations WHERE invitee_login = ?",

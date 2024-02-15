@@ -37,46 +37,155 @@ function HomeApp({
     onLogoutButtonClicked: () => void;
 }) {
     const user = useContext(UserContext);
-    // const ws = useWebSocket<WebsocketMessage>("ws://localhost:8000");
+    const [ws, setWS] = useState<WebSocket | null>(null);
 
-    // useEffect(() => {
-    //     const msg = ws.lastJsonMessage;
-    //     if (msg == null) return;
-    //     switch (msg.event) {
-    //         case "accepted_by":
-    //             user.set?.((user) =>
-    //                 user === null || typeof user === "string"
-    //                     ? user
-    //                     : { ...user, friends: [...user.friends, msg.login] }
-    //             );
-    //             break;
-    //         case "invited_by":
-    //             user.set?.((user) =>
-    //                 user === null || typeof user === "string"
-    //                     ? user
-    //                     : {
-    //                           ...user,
-    //                           friendInvitations: [...user.friends, msg.login],
-    //                       }
-    //             );
-    //             break;
-    //         case "rejected_by":
-    //             user.set?.((user) =>
-    //                 user === null || typeof user === "string"
-    //                     ? user
-    //                     : {
-    //                           ...user,
-    //                           friendInvitations: user.friendInvitations.filter(
-    //                               (inviterLogin) => inviterLogin !== user.login
-    //                           ),
-    //                       }
-    //             );
-    //             break;
-    //     }
-    // }, [user, ws.lastJsonMessage]);
+    useEffect(() => {
+        setWS((ws) => {
+            if (user === null || typeof user === "string") {
+                if (ws) ws.close();
+                return null;
+            }
+            return new WebSocket("ws://localhost:8000");
+        });
+    }, [user]);
 
-    function handleInviteFriendButtonClicked(friendLogin: string) {
-        fetch(`http://localhost:3001/inviteFriend?login=${friendLogin}`, {
+    useEffect(() => {
+        if (ws === null) return;
+
+        ws.onclose = () => setWS(null);
+        ws.onerror = console.error;
+        ws.onmessage = (strMsg: MessageEvent<string>) => {
+            const msg: WebsocketMessage = JSON.parse(strMsg.data);
+
+            console.log(msg);
+
+            switch (msg.event) {
+                case "accepted":
+                    user.set?.((user) =>
+                        user === null || typeof user === "string"
+                            ? user
+                            : {
+                                  ...user,
+                                  friendInvitations:
+                                      user.friendInvitations.filter(
+                                          (inviterLogin) =>
+                                              inviterLogin !== msg.login
+                                      ),
+                                  friends: [...user.friends, msg.login],
+                              }
+                    );
+                    break;
+
+                case "accepted_by":
+                    user.set?.((user) =>
+                        user === null || typeof user === "string"
+                            ? user
+                            : {
+                                  ...user,
+                                  pendingFriendInvites:
+                                      user.pendingFriendInvites.filter(
+                                          (inviterLogin) =>
+                                              inviterLogin !== msg.login
+                                      ),
+                                  friends: [...user.friends, msg.login],
+                              }
+                    );
+                    break;
+
+                case "invited":
+                    user.set?.((user) =>
+                        user === null || typeof user === "string"
+                            ? user
+                            : {
+                                  ...user,
+                                  pendingFriendInvites: [
+                                      ...user.friendInvitations,
+                                      msg.login,
+                                  ],
+                              }
+                    );
+                    break;
+
+                case "invited_by":
+                    console.log(`invited by "${msg.login}"`);
+                    user.set?.((user) =>
+                        user === null || typeof user === "string"
+                            ? user
+                            : {
+                                  ...user,
+                                  friendInvitations: [
+                                      ...user.friendInvitations,
+                                      msg.login,
+                                  ],
+                              }
+                    );
+                    break;
+
+                case "rejected":
+                    user.set?.((user) =>
+                        user === null || typeof user === "string"
+                            ? user
+                            : {
+                                  ...user,
+                                  friendInvitations:
+                                      user.friendInvitations.filter(
+                                          (inviterLogin) =>
+                                              inviterLogin !== msg.login
+                                      ),
+                              }
+                    );
+                    break;
+
+                case "rejected_by":
+                    user.set?.((user) =>
+                        user === null || typeof user === "string"
+                            ? user
+                            : {
+                                  ...user,
+                                  pendingFriendInvites:
+                                      user.pendingFriendInvites.filter(
+                                          (inviterLogin) =>
+                                              inviterLogin !== msg.login
+                                      ),
+                              }
+                    );
+                    break;
+
+                case "canceled":
+                    user.set?.((user) =>
+                        user === null || typeof user === "string"
+                            ? user
+                            : {
+                                  ...user,
+                                  pendingFriendInvites:
+                                      user.pendingFriendInvites.filter(
+                                          (inviterLogin) =>
+                                              inviterLogin !== msg.login
+                                      ),
+                              }
+                    );
+                    break;
+
+                case "canceled_by":
+                    user.set?.((user) =>
+                        user === null || typeof user === "string"
+                            ? user
+                            : {
+                                  ...user,
+                                  friendInvitations:
+                                      user.friendInvitations.filter(
+                                          (inviterLogin) =>
+                                              inviterLogin !== msg.login
+                                      ),
+                              }
+                    );
+                    break;
+            }
+        };
+    }, [user, ws]);
+
+    function handleInviteFriendButtonClicked(inviteeLogin: string) {
+        fetch(`http://localhost:3001/inviteFriend?login=${inviteeLogin}`, {
             credentials: "include",
         });
         // .then((res) => {
@@ -108,6 +217,15 @@ function HomeApp({
         );
     }
 
+    function handleCancelFriendInviteButtonClicked(inviteeLogin: string) {
+        fetch(
+            `http://localhost:3001/cancelFriendInvite?login=${inviteeLogin}`,
+            {
+                credentials: "include",
+            }
+        );
+    }
+
     return (
         <>
             <StatusBar onLogoutButtonClicked={onLogoutButtonClicked} />
@@ -121,6 +239,9 @@ function HomeApp({
                     }
                     onRejectFriendInviteButtonClicked={
                         handleRejectFriendInviteButtonClicked
+                    }
+                    onCancelFriendInviteButtonClicked={
+                        handleCancelFriendInviteButtonClicked
                     }
                 />
                 <Chatbox />
