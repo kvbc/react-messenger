@@ -1,3 +1,10 @@
+export const FRONTEND_PORT = 3000;
+export const BACKEND_PORT = 3001;
+export const WEBSOCKET_PORT = 8000;
+export const FRONTEND_URL = `http://localhost:${FRONTEND_PORT}`;
+export const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
+export const WEBSOCKET_URL = `ws://localhost:${WEBSOCKET_PORT}`;
+
 // https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-the-authenticated-user
 export type PrivateGithubUser = {
     login: string;
@@ -98,6 +105,19 @@ export type User = PublicGithubUser & {
     friendInvitations: string[]; // github logins
     pendingFriendInvites: string[]; // github logins
 };
+
+export type BackendEndpoint =
+    | "inviteFriend"
+    | "acceptFriendInvite"
+    | "rejectFriendInvite"
+    | "cancelFriendInvite";
+
+export function getBackendURL(
+    endpoint: BackendEndpoint,
+    login: string
+): string {
+    return `${BACKEND_URL}/${endpoint}?login=${login}`;
+}
 
 export type BackendErrorResponse = {
     message: string | null;

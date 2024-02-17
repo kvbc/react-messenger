@@ -5,9 +5,12 @@ import cookieParser from "cookie-parser";
 import sqlite3, { Database } from "sqlite3";
 import cookie from "cookie";
 import {
+    BACKEND_PORT,
     BackendErrorResponse,
+    FRONTEND_URL,
     PublicGithubUser,
     User,
+    WEBSOCKET_PORT,
     WebsocketMessage,
 } from "@react-messenger/shared";
 import { WebSocket, WebSocketServer } from "ws";
@@ -15,9 +18,6 @@ import { WebSocket, WebSocketServer } from "ws";
 sqlite3.verbose();
 
 configDotenv();
-const HTTP_PORT: number = parseInt(process.env.HTTP_PORT!);
-const WEBSOCKET_PORT: number = parseInt(process.env.WEBSOCKET_PORT!);
-const FRONTEND_URL: string = process.env.FRONTEND_URL!;
 const CLIENT_ID: string = process.env.CLIENT_ID!;
 const CLIENT_SECRET: string = process.env.CLIENT_SECRET!;
 
@@ -476,8 +476,8 @@ app.get("/login", (req, res) => {
     }
 });
 
-app.listen(HTTP_PORT, () => {
-    console.log(`Listening on port ${HTTP_PORT}`);
+app.listen(BACKEND_PORT, () => {
+    console.log(`Listening on port ${BACKEND_PORT}`);
 });
 
 // type ExtractMethodNames<T> = { [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never }[keyof T];
