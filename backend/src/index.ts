@@ -10,10 +10,11 @@ import {
     FRONTEND_URL,
     PublicGithubUser,
     User,
-    WEBSOCKET_PORT,
     WebsocketMessage,
 } from "@react-messenger/shared";
 import { WebSocket, WebSocketServer } from "ws";
+import https from "node:https";
+import fs from "fs";
 
 sqlite3.verbose();
 
@@ -62,24 +63,7 @@ type FriendInvitationsRow = {
 
 //
 
-const wss = new WebSocketServer({ port: WEBSOCKET_PORT });
 const wsConnections: { [accessToken: string]: WebSocket | undefined } = {};
-wss.on("connection", (ws, req) => {
-    console.log("[WS] new connection");
-
-    ws.onerror = console.error;
-
-    if (req.headers.cookie == null) return ws.close();
-
-    const cookies = cookie.parse(req.headers.cookie);
-    const accessToken: string | undefined = cookies.accessToken;
-    if (!accessToken) return ws.close();
-
-    wsConnections[accessToken] = ws;
-    ws.onclose = () => {
-        delete wsConnections[accessToken];
-    };
-});
 
 //
 
@@ -91,6 +75,7 @@ app.use(
         credentials: true,
         origin: FRONTEND_URL,
         exposedHeaders: "Set-Cookie",
+        allowedHeaders: "Set-Cookie",
     })
 );
 app.use(cookieParser());
@@ -337,14 +322,14 @@ app.get("/logout", (req, res) => {
     res.status(200)
         .setHeader(
             "Set-Cookie",
-            `accessToken=deleted; Path=/; Max-Age=0; HttpOnly` //; SameSite=None`
+            `accessToken=deleted; Path=/; Max-Age=0; HttpOnly; SameSite=None; Secure`
         )
         .send();
 });
 
 app.get("/login", (req, res) => {
     function returnUser(accessToken: string) {
-        fetchGithubUserFromAccessToken(accessToken).then(
+        return fetchGithubUserFromAccessToken(accessToken).then(
             (ghUser: PublicGithubUser | null) => {
                 if (ghUser === null)
                     return resError(
@@ -413,7 +398,7 @@ app.get("/login", (req, res) => {
                                         res.status(200)
                                             .setHeader(
                                                 "Set-Cookie",
-                                                `accessToken=${accessToken}; Path=/; HttpOnly` //; SameSite=None`
+                                                `accessToken=${accessToken}; Path=/; HttpOnly; SameSite=None; Secure`
                                             )
                                             .json({ user });
                                     }
@@ -436,7 +421,7 @@ app.get("/login", (req, res) => {
 
     if (code == null) {
         if (noRedirect === "true") {
-            resError(res, 500, null, false);
+            resError(res, 500, "case no. 1", false);
         } else {
             const redirectURI = FRONTEND_URL;
             res.redirect(
@@ -448,8 +433,8 @@ app.get("/login", (req, res) => {
 
     if (typeof code !== "string") return resError(res, 500);
     if (handledAccessCodes.includes(code))
-        return resError(res, 500, null, false);
-    handledAccessCodes.push(code);
+        return resError(res, 500, "case no. 2", false);
+    // handledAccessCodes.push(code);
     console.log(`Code: ${code}`);
 
     {
@@ -470,15 +455,53 @@ app.get("/login", (req, res) => {
                 return pRes.json();
             })
             .then((data) => {
-                // console.log(`>>>> `, data);
-                returnUser(data.access_token);
+                // fix race condition (this fucking strict mode man...)
+                console.log(`>>>> `, data);
+                returnUser(data.access_token).then(() => {
+                    console.log(`Code handled (${code})`);
+                    handledAccessCodes.push(code);
+                });
             })
             .catch((err) => resError(res, 500));
     }
 });
 
-app.listen(BACKEND_PORT, () => {
-    console.log(`Listening on port ${BACKEND_PORT}`);
+// app.listen(BACKEND_PORT, () => {
+//     console.log(`Listening on port ${BACKEND_PORT}`);
+// });
+
+const server = https
+    .createServer(
+        {
+            key: fs.readFileSync(
+                "../frontend/certificates/localhost-key.pem",
+                "utf-8"
+            ),
+            cert: fs.readFileSync(
+                "../frontend/certificates/localhost.pem",
+                "utf-8"
+            ),
+        },
+        app
+    )
+    .listen(BACKEND_PORT);
+
+const wss = new WebSocketServer({ server });
+wss.on("connection", (ws, req) => {
+    console.log("[WS] new connection");
+
+    ws.onerror = console.error;
+
+    if (req.headers.cookie == null) return ws.close();
+
+    const cookies = cookie.parse(req.headers.cookie);
+    const accessToken: string | undefined = cookies.accessToken;
+    if (!accessToken) return ws.close();
+
+    wsConnections[accessToken] = ws;
+    ws.onclose = () => {
+        delete wsConnections[accessToken];
+    };
 });
 
 // type ExtractMethodNames<T> = { [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never }[keyof T];

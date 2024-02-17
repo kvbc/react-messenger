@@ -3,13 +3,20 @@
 import { FaReact } from "react-icons/fa6";
 import { FaGithub } from "react-icons/fa";
 import { useRouter } from "next/navigation";
-import { useContext, useEffect, useState } from "react";
+import {
+    Dispatch,
+    SetStateAction,
+    useContext,
+    useEffect,
+    useState,
+} from "react";
 import { UserContext } from "@/contexts/UserContext";
 import {
     BackendQuery,
     BackendResponseError,
     BackendResponseLogin,
     User,
+    WEBSOCKET_URL,
     WebsocketMessage,
     getBackendURL,
 } from "@react-messenger/shared";
@@ -19,8 +26,8 @@ import StatusBar from "@/components/StatusBar";
 import useWebSocket from "react-use-websocket";
 import { QueryFunctionContext, useQuery } from "react-query";
 
-const BACKEND_URL: string = process.env.NEXT_PUBLIC_BACKEND_URL!;
-const WEBSOCKET_URL: string = process.env.NEXT_PUBLIC_WEBSOCKET_URL!;
+// const BACKEND_URL: string = process.env.NEXT_PUBLIC_BACKEND_URL!;
+// const WEBSOCKET_URL: string = process.env.NEXT_PUBLIC_WEBSOCKET_URL!;
 
 //
 // Displayed whenever the user is not logged in or there's a login error
@@ -209,149 +216,111 @@ function fetchFromBackend(
 
 function useWebsocketConnection() {
     const user = useContext(UserContext);
-    const [ws, setWS] = useState<WebSocket | null>(null);
+    const [ws, _setWS] = useState<WebSocket | null>(null);
+
+    function setWS(
+        ws_or_cb:
+            | (WebSocket | null)
+            | ((ws: WebSocket | null) => WebSocket | null)
+    ) {
+        function closeOld(ws: WebSocket | null, newWS: WebSocket | null) {
+            if (ws && !newWS) ws.close();
+            return newWS;
+        }
+        if (typeof ws_or_cb === "function")
+            _setWS((ws) => closeOld(ws, ws_or_cb(ws)));
+        else _setWS((ws) => closeOld(ws, ws_or_cb));
+    }
 
     useEffect(() => {
         setWS((ws) => {
-            if (!user.value) {
-                if (ws) ws.close();
-                return null;
-            }
-            return new WebSocket(WEBSOCKET_URL);
+            if (!user.value) return null;
+            console.log(WEBSOCKET_URL);
+            return ws ?? new WebSocket(WEBSOCKET_URL);
         });
     }, [user]);
 
     useEffect(() => {
         if (ws === null) return;
 
-        ws.onclose = () => setWS(null);
         ws.onerror = console.error;
         ws.onmessage = (strMsg: MessageEvent<string>) => {
             const msg: WebsocketMessage = JSON.parse(strMsg.data);
 
-            console.log(msg);
-
             switch (msg.event) {
                 case "accepted":
-                    user.set?.((user) =>
-                        user
-                            ? {
-                                  ...user,
-                                  friendInvitations:
-                                      user.friendInvitations.filter(
-                                          (inviterLogin) =>
-                                              inviterLogin !== msg.login
-                                      ),
-                                  friends: [...user.friends, msg.login],
-                              }
-                            : user
-                    );
+                    removeFriendInvite();
+                    addFriend();
                     break;
 
                 case "accepted_by":
-                    user.set?.((user) =>
-                        user
-                            ? {
-                                  ...user,
-                                  pendingFriendInvites:
-                                      user.pendingFriendInvites.filter(
-                                          (inviterLogin) =>
-                                              inviterLogin !== msg.login
-                                      ),
-                                  friends: [...user.friends, msg.login],
-                              }
-                            : user
-                    );
+                    removePendingFriendInvite();
+                    addFriend();
                     break;
 
                 case "invited":
-                    user.set?.((user) =>
-                        user
-                            ? {
-                                  ...user,
-                                  pendingFriendInvites: [
-                                      ...user.friendInvitations,
-                                      msg.login,
-                                  ],
-                              }
-                            : user
-                    );
+                    addPendingFriendInvite();
                     break;
 
                 case "invited_by":
-                    console.log(`invited by "${msg.login}"`);
-                    user.set?.((user) =>
-                        user
-                            ? {
-                                  ...user,
-                                  friendInvitations: [
-                                      ...user.friendInvitations,
-                                      msg.login,
-                                  ],
-                              }
-                            : user
-                    );
-                    break;
-
-                case "rejected":
-                    user.set?.((user) =>
-                        user
-                            ? {
-                                  ...user,
-                                  friendInvitations:
-                                      user.friendInvitations.filter(
-                                          (inviterLogin) =>
-                                              inviterLogin !== msg.login
-                                      ),
-                              }
-                            : user
-                    );
-                    break;
-
-                case "rejected_by":
-                    user.set?.((user) =>
-                        user
-                            ? {
-                                  ...user,
-                                  pendingFriendInvites:
-                                      user.pendingFriendInvites.filter(
-                                          (inviterLogin) =>
-                                              inviterLogin !== msg.login
-                                      ),
-                              }
-                            : user
-                    );
-                    break;
-
-                case "canceled":
-                    user.set?.((user) =>
-                        user
-                            ? {
-                                  ...user,
-                                  pendingFriendInvites:
-                                      user.pendingFriendInvites.filter(
-                                          (inviterLogin) =>
-                                              inviterLogin !== msg.login
-                                      ),
-                              }
-                            : user
-                    );
+                    addFriendInvite();
                     break;
 
                 case "canceled_by":
-                    user.set?.((user) =>
-                        user
-                            ? {
-                                  ...user,
-                                  friendInvitations:
-                                      user.friendInvitations.filter(
-                                          (inviterLogin) =>
-                                              inviterLogin !== msg.login
-                                      ),
-                              }
-                            : user
-                    );
+                case "rejected":
+                    removeFriendInvite();
                     break;
+
+                case "canceled":
+                case "rejected_by":
+                    removePendingFriendInvite();
+                    break;
+            }
+
+            function removeFriendInvite() {
+                setUser((user) => ({
+                    ...user,
+                    friendInvitations: user.friendInvitations.filter(
+                        (inviterLogin) => inviterLogin !== msg.login
+                    ),
+                }));
+            }
+
+            function removePendingFriendInvite() {
+                setUser((user) => ({
+                    ...user,
+                    pendingFriendInvites: user.pendingFriendInvites.filter(
+                        (inviterLogin) => inviterLogin !== msg.login
+                    ),
+                }));
+            }
+
+            function addFriendInvite() {
+                setUser((user) => ({
+                    ...user,
+                    friendInvitations: [...user.friendInvitations, msg.login],
+                }));
+            }
+
+            function addPendingFriendInvite() {
+                setUser((user) => ({
+                    ...user,
+                    pendingFriendInvites: [
+                        ...user.pendingFriendInvites,
+                        msg.login,
+                    ],
+                }));
+            }
+
+            function addFriend() {
+                setUser((user) => ({
+                    ...user,
+                    friends: [...user.friends, msg.login],
+                }));
+            }
+
+            function setUser(cb: (user: User) => User) {
+                user.set?.((user) => (user ? cb(user) : user));
             }
         };
     }, [user, ws]);

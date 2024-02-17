@@ -1,9 +1,8 @@
 export const FRONTEND_PORT = 3000;
 export const BACKEND_PORT = 3001;
-export const WEBSOCKET_PORT = 8000;
-export const FRONTEND_URL = `http://localhost:${FRONTEND_PORT}`;
-export const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
-export const WEBSOCKET_URL = `ws://localhost:${WEBSOCKET_PORT}`;
+export const FRONTEND_URL = `https://localhost:${FRONTEND_PORT}`;
+export const BACKEND_URL = `https://localhost:${BACKEND_PORT}`;
+export const WEBSOCKET_URL = `wss://localhost:${BACKEND_PORT}`;
 
 // https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-the-authenticated-user
 export type PrivateGithubUser = {
