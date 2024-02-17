@@ -12,7 +12,7 @@ export default function StatusBar({
 
     return (
         <div className="w-full">
-            {user.value == null ? (
+            {!user.value ? (
                 <div className="flex justify-center items-center">
                     <Loading />
                 </div>

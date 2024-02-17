@@ -83,6 +83,8 @@ wss.on("connection", (ws, req) => {
 
 //
 
+const handledAccessCodes: string[] = [];
+
 const app = express();
 app.use(
     cors({
@@ -434,7 +436,7 @@ app.get("/login", (req, res) => {
 
     if (code == null) {
         if (noRedirect === "true") {
-            res.status(200).send();
+            res.status(500).send();
         } else {
             const redirectURI = FRONTEND_URL;
             res.redirect(
@@ -445,6 +447,8 @@ app.get("/login", (req, res) => {
     }
 
     if (typeof code !== "string") return res.status(500).send();
+    if (handledAccessCodes.includes(code)) return res.status(569).send();
+    handledAccessCodes.push(code);
     console.log(`Code: ${code}`);
 
     {

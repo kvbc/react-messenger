@@ -11,6 +11,7 @@ import FriendsList from "@/components/FriendsList";
 import Chatbox from "@/components/Chatbox";
 import StatusBar from "@/components/StatusBar";
 import useWebSocket from "react-use-websocket";
+import { useQuery } from "react-query";
 
 const BACKEND_URL: string = process.env.NEXT_PUBLIC_BACKEND_URL!;
 const WEBSOCKET_URL: string = process.env.NEXT_PUBLIC_WEBSOCKET_URL!;
@@ -44,11 +45,10 @@ function HomeApp({
 
     useEffect(() => {
         setWS((ws) => {
-            if (user.value === null || typeof user.value === "string") {
+            if (!user.value) {
                 if (ws) ws.close();
                 return null;
             }
-            console.log(user);
             return new WebSocket(WEBSOCKET_URL);
         });
     }, [user]);
@@ -66,9 +66,8 @@ function HomeApp({
             switch (msg.event) {
                 case "accepted":
                     user.set?.((user) =>
-                        user === null || typeof user === "string"
-                            ? user
-                            : {
+                        user
+                            ? {
                                   ...user,
                                   friendInvitations:
                                       user.friendInvitations.filter(
@@ -77,14 +76,14 @@ function HomeApp({
                                       ),
                                   friends: [...user.friends, msg.login],
                               }
+                            : user
                     );
                     break;
 
                 case "accepted_by":
                     user.set?.((user) =>
-                        user === null || typeof user === "string"
-                            ? user
-                            : {
+                        user
+                            ? {
                                   ...user,
                                   pendingFriendInvites:
                                       user.pendingFriendInvites.filter(
@@ -93,43 +92,43 @@ function HomeApp({
                                       ),
                                   friends: [...user.friends, msg.login],
                               }
+                            : user
                     );
                     break;
 
                 case "invited":
                     user.set?.((user) =>
-                        user === null || typeof user === "string"
-                            ? user
-                            : {
+                        user
+                            ? {
                                   ...user,
                                   pendingFriendInvites: [
                                       ...user.friendInvitations,
                                       msg.login,
                                   ],
                               }
+                            : user
                     );
                     break;
 
                 case "invited_by":
                     console.log(`invited by "${msg.login}"`);
                     user.set?.((user) =>
-                        user === null || typeof user === "string"
-                            ? user
-                            : {
+                        user
+                            ? {
                                   ...user,
                                   friendInvitations: [
                                       ...user.friendInvitations,
                                       msg.login,
                                   ],
                               }
+                            : user
                     );
                     break;
 
                 case "rejected":
                     user.set?.((user) =>
-                        user === null || typeof user === "string"
-                            ? user
-                            : {
+                        user
+                            ? {
                                   ...user,
                                   friendInvitations:
                                       user.friendInvitations.filter(
@@ -137,14 +136,14 @@ function HomeApp({
                                               inviterLogin !== msg.login
                                       ),
                               }
+                            : user
                     );
                     break;
 
                 case "rejected_by":
                     user.set?.((user) =>
-                        user === null || typeof user === "string"
-                            ? user
-                            : {
+                        user
+                            ? {
                                   ...user,
                                   pendingFriendInvites:
                                       user.pendingFriendInvites.filter(
@@ -152,14 +151,14 @@ function HomeApp({
                                               inviterLogin !== msg.login
                                       ),
                               }
+                            : user
                     );
                     break;
 
                 case "canceled":
                     user.set?.((user) =>
-                        user === null || typeof user === "string"
-                            ? user
-                            : {
+                        user
+                            ? {
                                   ...user,
                                   pendingFriendInvites:
                                       user.pendingFriendInvites.filter(
@@ -167,14 +166,14 @@ function HomeApp({
                                               inviterLogin !== msg.login
                                       ),
                               }
+                            : user
                     );
                     break;
 
                 case "canceled_by":
                     user.set?.((user) =>
-                        user === null || typeof user === "string"
-                            ? user
-                            : {
+                        user
+                            ? {
                                   ...user,
                                   friendInvitations:
                                       user.friendInvitations.filter(
@@ -182,6 +181,7 @@ function HomeApp({
                                               inviterLogin !== msg.login
                                       ),
                               }
+                            : user
                     );
                     break;
             }
@@ -247,71 +247,59 @@ function HomeApp({
 
 export default function Home() {
     const router = useRouter();
-    // null - not loading
-    // string - loading
-    // User - loaded
-    const [user, setUser] = useState<User | string | null>(null);
-    const [code, setCode] = useState<string | null>(null);
-
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        setCode(urlParams.get("code"));
-    }, []);
-
-    useEffect(() => {
-        setUser(code);
-    }, [code]);
-
-    useEffect(() => {
-        // if (typeof user === null) {
-        //     const fetchID = String(Math.random());
-        //     setUser(fetchID);
-        //     return;
-        // }
-        if (typeof user === "string") {
-            const fetchID = user;
-            const controller = new AbortController();
-            fetch(
-                `${BACKEND_URL}/login` +
-                    (code != null ? `?code=${code}` : "?noRedirect=true"),
-                {
-                    credentials: "include",
-                    headers: {
-                        Accept: "application/json",
-                    },
-                    signal: controller.signal,
-                }
-            )
+    const [user, setUser] = useState<User | undefined>(undefined);
+    const {
+        data: userData,
+        status: userStatus,
+        refetch: refetchUser,
+    } = useQuery<User>({
+        queryKey: "user",
+        retry: (_, resStatus) => {
+            if (resStatus === 569) return false;
+            const urlParams = new URLSearchParams(window.location.search);
+            const accessCode = urlParams.get("code");
+            return accessCode !== null;
+        },
+        queryFn: (ctx) => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const accessCode = urlParams.get("code");
+            const urlQuery =
+                accessCode === null ? "noRedirect=true" : `code=${accessCode}`;
+            return fetch(`${BACKEND_URL}/login?${urlQuery}`, {
+                credentials: "include",
+                headers: {
+                    Accept: "application/json",
+                },
+                signal: ctx.signal,
+            })
                 .then((res) => {
-                    console.log(`Login status ${res.status}`);
-                    if (res.status !== 200) throw "Status not OK";
-                    return res.json();
+                    console.log(`Login status: ${res.status}`);
+                    if (res.status === 200) return res.json();
+                    throw res.status;
                 })
                 .then((data) => {
-                    setUser(data.user);
-                })
-                .catch((err) => {
-                    console.error(err);
-                    console.log("ERRORD");
-                    setUser((user) => (user === fetchID ? null : user));
+                    return data.user as User;
                 });
-            return () => {
-                setUser((user) => (user === fetchID ? null : user));
-                controller.abort();
-            };
-        }
-    }, [user, code]);
+        },
+    });
+
+    useEffect(() => {
+        setUser(userData);
+    }, [userData]);
 
     function handleLoginButtonClicked() {
         router.push(`${BACKEND_URL}/login`);
     }
 
     function handleLogoutButtonClicked() {
-        setUser(null);
         fetch(`${BACKEND_URL}/logout`, {
             credentials: "include",
+        }).then(() => {
+            refetchUser();
         });
     }
+
+    console.log(userStatus);
 
     return (
         <div className="h-screen from-slate-800 to-slate-950 bg-gradient-to-b text-white flex flex-col items-center justify-center gap-6 p-6">
@@ -321,12 +309,13 @@ export default function Home() {
                 <h1>React Messenger</h1>
             </div>
 
-            {user === null ? (
+            {(userStatus === "error" || userStatus === "idle") && (
                 <HomeLogin onLoginButtonClicked={handleLoginButtonClicked} />
-            ) : (
+            )}
+            {(userStatus === "loading" || userStatus === "success") && (
                 <UserContext.Provider
                     value={{
-                        value: typeof user === "string" ? null : user,
+                        value: user,
                         set: setUser,
                     }}
                 >

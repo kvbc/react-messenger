@@ -2,9 +2,9 @@ import { User } from "@react-messenger/shared";
 import { Dispatch, SetStateAction, createContext } from "react";
 
 export const UserContext = createContext<{
-    value: User | null;
-    set: Dispatch<SetStateAction<User | string | null>> | null;
+    value: User | undefined;
+    set: Dispatch<SetStateAction<User | undefined>> | undefined;
 }>({
-    value: null,
-    set: null,
+    value: undefined,
+    set: undefined,
 });
