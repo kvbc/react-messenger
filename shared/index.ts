@@ -110,18 +110,49 @@ export type BackendEndpoint =
     | "inviteFriend"
     | "acceptFriendInvite"
     | "rejectFriendInvite"
-    | "cancelFriendInvite";
+    | "cancelFriendInvite"
+    | "login";
 
-export function getBackendURL(
-    endpoint: BackendEndpoint,
-    login: string
-): string {
-    return `${BACKEND_URL}/${endpoint}?login=${login}`;
+export type BackendQuery =
+    | {
+          endpoint:
+              | "inviteFriend"
+              | "acceptFriendInvite"
+              | "rejectFriendInvite"
+              | "cancelFriendInvite";
+          params: {
+              login: string;
+          };
+      }
+    | {
+          endpoint: "login";
+          params: {
+              noRedirect: boolean;
+              code: string | null;
+          };
+      }
+    | "logout"
+    | "login";
+
+export function getBackendURL(query: BackendQuery): string {
+    if (typeof query === "string") return `${BACKEND_URL}/${query}`;
+    let params = "";
+    for (const [key, value] of Object.entries(query.params))
+        if (value !== null && value !== undefined) {
+            params += `&${key}=${value}`;
+        }
+    return `${BACKEND_URL}/${query.endpoint}?${params}`;
 }
 
-export type BackendErrorResponse = {
+export type BackendResponseError = {
     message: string | null;
+    retry: boolean;
 };
+
+export type BackendResponseLogin = {
+    user: User;
+};
+
 export type WebsocketMessage = {
     event:
         | "invited"

@@ -5,12 +5,19 @@ import { FaGithub } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import { useContext, useEffect, useState } from "react";
 import { UserContext } from "@/contexts/UserContext";
-import { User, WebsocketMessage, getBackendURL } from "@react-messenger/shared";
+import {
+    BackendQuery,
+    BackendResponseError,
+    BackendResponseLogin,
+    User,
+    WebsocketMessage,
+    getBackendURL,
+} from "@react-messenger/shared";
 import FriendsList from "@/components/FriendsList";
 import Chatbox from "@/components/Chatbox";
 import StatusBar from "@/components/StatusBar";
 import useWebSocket from "react-use-websocket";
-import { useQuery } from "react-query";
+import { QueryFunctionContext, useQuery } from "react-query";
 
 const BACKEND_URL: string = process.env.NEXT_PUBLIC_BACKEND_URL!;
 const WEBSOCKET_URL: string = process.env.NEXT_PUBLIC_WEBSOCKET_URL!;
@@ -48,26 +55,30 @@ function HomeApp({
     useWebsocketConnection();
 
     function handleInviteFriendButtonClicked(inviteeLogin: string) {
-        fetch(getBackendURL("inviteFriend", inviteeLogin), {
-            credentials: "include",
+        fetchFromBackend({
+            endpoint: "inviteFriend",
+            params: { login: inviteeLogin },
         });
     }
 
     function handleAcceptFriendInviteButtonClicked(inviterLogin: string) {
-        fetch(getBackendURL("acceptFriendInvite", inviterLogin), {
-            credentials: "include",
+        fetchFromBackend({
+            endpoint: "acceptFriendInvite",
+            params: { login: inviterLogin },
         });
     }
 
     function handleRejectFriendInviteButtonClicked(inviterLogin: string) {
-        fetch(getBackendURL("rejectFriendInvite", inviterLogin), {
-            credentials: "include",
+        fetchFromBackend({
+            endpoint: "rejectFriendInvite",
+            params: { login: inviterLogin },
         });
     }
 
     function handleCancelFriendInviteButtonClicked(inviteeLogin: string) {
-        fetch(getBackendURL("cancelFriendInvite", inviteeLogin), {
-            credentials: "include",
+        fetchFromBackend({
+            endpoint: "cancelFriendInvite",
+            params: { login: inviteeLogin },
         });
     }
 
@@ -102,33 +113,28 @@ export default function Home() {
         data: userData,
         status: userStatus,
         refetch: refetchUser,
-    } = useQuery<User>({
+    } = useQuery<User, BackendResponseError>({
         queryKey: "user",
-        retry: (_, resStatus) => {
-            if (resStatus === 569) return false;
-            const urlParams = new URLSearchParams(window.location.search);
-            const accessCode = urlParams.get("code");
-            return accessCode !== null;
-        },
+        retry: (_, err) => err.retry,
         queryFn: (ctx) => {
             const urlParams = new URLSearchParams(window.location.search);
             const accessCode = urlParams.get("code");
-            const urlQuery =
-                accessCode === null ? "noRedirect=true" : `code=${accessCode}`;
-            return fetch(`${BACKEND_URL}/login?${urlQuery}`, {
-                credentials: "include",
-                headers: {
-                    Accept: "application/json",
+            return fetchFromBackend(
+                {
+                    endpoint: "login",
+                    params: {
+                        code: accessCode,
+                        noRedirect: accessCode === null,
+                    },
                 },
-                signal: ctx.signal,
-            })
+                ctx
+            )
                 .then((res) => {
                     console.log(`Login status: ${res.status}`);
-                    if (res.status === 200) return res.json();
-                    throw res.status;
+                    return res.json();
                 })
-                .then((data) => {
-                    return data.user as User;
+                .then((data: BackendResponseLogin) => {
+                    return data.user;
                 });
         },
     });
@@ -138,18 +144,14 @@ export default function Home() {
     }, [userData]);
 
     function handleLoginButtonClicked() {
-        router.push(`${BACKEND_URL}/login`);
+        router.push(getBackendURL("login"));
     }
 
     function handleLogoutButtonClicked() {
-        fetch(`${BACKEND_URL}/logout`, {
-            credentials: "include",
-        }).then(() => {
+        fetchFromBackend("logout").then(() => {
             refetchUser();
         });
     }
-
-    console.log(userStatus);
 
     return (
         <div className="h-screen from-slate-800 to-slate-950 bg-gradient-to-b text-white flex flex-col items-center justify-center gap-6 p-6">
@@ -178,9 +180,29 @@ export default function Home() {
     );
 }
 
+function fetchFromBackend(
+    query: BackendQuery,
+    queryContext: QueryFunctionContext | null = null
+) {
+    return fetch(getBackendURL(query), {
+        credentials: "include",
+        headers: {
+            Accept: "application/json",
+        },
+        signal: queryContext?.signal,
+    }).then((res) => {
+        if (res.status === 200) return res;
+        return res.json().then((err: BackendResponseError) => {
+            // window.alert(err.message ?? "Unknown Server Error");
+            console.error(err.message ?? "Unknown Server Error");
+            throw err;
+        });
+    });
+}
+
 /*
  *
- * This is a mess!
+ * This is a mess
  * TODO: Clean-up
  *
  */

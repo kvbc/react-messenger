@@ -6,7 +6,7 @@ import sqlite3, { Database } from "sqlite3";
 import cookie from "cookie";
 import {
     BACKEND_PORT,
-    BackendErrorResponse,
+    BackendResponseError,
     FRONTEND_URL,
     PublicGithubUser,
     User,
@@ -436,7 +436,7 @@ app.get("/login", (req, res) => {
 
     if (code == null) {
         if (noRedirect === "true") {
-            res.status(500).send();
+            resError(res, 500, null, false);
         } else {
             const redirectURI = FRONTEND_URL;
             res.redirect(
@@ -446,8 +446,9 @@ app.get("/login", (req, res) => {
         return;
     }
 
-    if (typeof code !== "string") return res.status(500).send();
-    if (handledAccessCodes.includes(code)) return res.status(569).send();
+    if (typeof code !== "string") return resError(res, 500);
+    if (handledAccessCodes.includes(code))
+        return resError(res, 500, null, false);
     handledAccessCodes.push(code);
     console.log(`Code: ${code}`);
 
@@ -472,7 +473,7 @@ app.get("/login", (req, res) => {
                 // console.log(`>>>> `, data);
                 returnUser(data.access_token);
             })
-            .catch((err) => res.status(500).send());
+            .catch((err) => resError(res, 500));
     }
 });
 
@@ -503,10 +504,11 @@ app.listen(BACKEND_PORT, () => {
 function resError(
     res: Response,
     statusCode: number,
-    message: string | null = null
+    message: string | null = null,
+    retry: boolean = true
 ): null {
-    const json: BackendErrorResponse = { message };
-    console.error(`[Error ${statusCode}] ${message}`);
+    const json: BackendResponseError = { message, retry };
+    console.error(`[Error ${statusCode}] ${json.message} ${json.retry}`);
     res.status(statusCode).json(json);
     return null;
 }
