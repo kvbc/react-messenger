@@ -12,6 +12,9 @@ import Chatbox from "@/components/Chatbox";
 import StatusBar from "@/components/StatusBar";
 import useWebSocket from "react-use-websocket";
 
+const BACKEND_URL: string = process.env.NEXT_PUBLIC_BACKEND_URL!;
+const WEBSOCKET_URL: string = process.env.NEXT_PUBLIC_WEBSOCKET_URL!;
+
 function HomeLogin({
     onLoginButtonClicked,
 }: {
@@ -41,11 +44,12 @@ function HomeApp({
 
     useEffect(() => {
         setWS((ws) => {
-            if (user === null || typeof user === "string") {
+            if (user.value === null || typeof user.value === "string") {
                 if (ws) ws.close();
                 return null;
             }
-            return new WebSocket("ws://localhost:8000");
+            console.log(user);
+            return new WebSocket(WEBSOCKET_URL);
         });
     }, [user]);
 
@@ -185,7 +189,7 @@ function HomeApp({
     }, [user, ws]);
 
     function handleInviteFriendButtonClicked(inviteeLogin: string) {
-        fetch(`http://localhost:3001/inviteFriend?login=${inviteeLogin}`, {
+        fetch(`${BACKEND_URL}/inviteFriend?login=${inviteeLogin}`, {
             credentials: "include",
         });
         // .then((res) => {
@@ -200,30 +204,21 @@ function HomeApp({
     }
 
     function handleAcceptFriendInviteButtonClicked(inviterLogin: string) {
-        fetch(
-            `http://localhost:3001/acceptFriendInvite?login=${inviterLogin}`,
-            {
-                credentials: "include",
-            }
-        );
+        fetch(`${BACKEND_URL}/acceptFriendInvite?login=${inviterLogin}`, {
+            credentials: "include",
+        });
     }
 
     function handleRejectFriendInviteButtonClicked(inviterLogin: string) {
-        fetch(
-            `http://localhost:3001/rejectFriendInvite?login=${inviterLogin}`,
-            {
-                credentials: "include",
-            }
-        );
+        fetch(`${BACKEND_URL}/rejectFriendInvite?login=${inviterLogin}`, {
+            credentials: "include",
+        });
     }
 
     function handleCancelFriendInviteButtonClicked(inviteeLogin: string) {
-        fetch(
-            `http://localhost:3001/cancelFriendInvite?login=${inviteeLogin}`,
-            {
-                credentials: "include",
-            }
-        );
+        fetch(`${BACKEND_URL}/cancelFriendInvite?login=${inviteeLogin}`, {
+            credentials: "include",
+        });
     }
 
     return (
@@ -268,14 +263,16 @@ export default function Home() {
     }, [code]);
 
     useEffect(() => {
-        if (typeof user === null) {
-            const fetchID = String(Math.random());
-            setUser(fetchID);
-        } else if (typeof user === "string") {
+        // if (typeof user === null) {
+        //     const fetchID = String(Math.random());
+        //     setUser(fetchID);
+        //     return;
+        // }
+        if (typeof user === "string") {
             const fetchID = user;
             const controller = new AbortController();
             fetch(
-                `http://localhost:3001/login` +
+                `${BACKEND_URL}/login` +
                     (code != null ? `?code=${code}` : "?noRedirect=true"),
                 {
                     credentials: "include",
@@ -299,19 +296,19 @@ export default function Home() {
                     setUser((user) => (user === fetchID ? null : user));
                 });
             return () => {
-                // setUser((user) => (user === fetchID ? null : user));
+                setUser((user) => (user === fetchID ? null : user));
                 controller.abort();
             };
         }
     }, [user, code]);
 
     function handleLoginButtonClicked() {
-        router.push("http://localhost:3001/login");
+        router.push(`${BACKEND_URL}/login`);
     }
 
     function handleLogoutButtonClicked() {
         setUser(null);
-        fetch(`http://localhost:3001/logout`, {
+        fetch(`${BACKEND_URL}/logout`, {
             credentials: "include",
         });
     }

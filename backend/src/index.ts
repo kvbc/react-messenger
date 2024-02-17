@@ -15,7 +15,9 @@ import { WebSocket, WebSocketServer } from "ws";
 sqlite3.verbose();
 
 configDotenv();
-const PORT: number = parseInt(process.env.PORT!);
+const HTTP_PORT: number = parseInt(process.env.HTTP_PORT!);
+const WEBSOCKET_PORT: number = parseInt(process.env.WEBSOCKET_PORT!);
+const FRONTEND_URL: string = process.env.FRONTEND_URL!;
 const CLIENT_ID: string = process.env.CLIENT_ID!;
 const CLIENT_SECRET: string = process.env.CLIENT_SECRET!;
 
@@ -60,7 +62,7 @@ type FriendInvitationsRow = {
 
 //
 
-const wss = new WebSocketServer({ port: 8000 });
+const wss = new WebSocketServer({ port: WEBSOCKET_PORT });
 const wsConnections: { [accessToken: string]: WebSocket | undefined } = {};
 wss.on("connection", (ws, req) => {
     console.log("[WS] new connection");
@@ -85,7 +87,7 @@ const app = express();
 app.use(
     cors({
         credentials: true,
-        origin: "http://localhost:3000",
+        origin: FRONTEND_URL,
         exposedHeaders: "Set-Cookie",
     })
 );
@@ -295,10 +297,10 @@ app.get("/inviteFriend", (req, res) => {
                         return resError(res, 500, "Friend already invited");
                     res.status(200).send();
 
-                    db.get(
+                    db.get<Pick<UsersRow, "access_token">>(
                         "SELECT access_token FROM Users WHERE login = ?",
                         [inviteeLogin],
-                        function (err, inviteeRow: UsersRow) {
+                        function (err, inviteeRow) {
                             if (err) return;
                             // send to inviter
                             {
@@ -434,7 +436,7 @@ app.get("/login", (req, res) => {
         if (noRedirect === "true") {
             res.status(200).send();
         } else {
-            const redirectURI = "http://localhost:3000";
+            const redirectURI = FRONTEND_URL;
             res.redirect(
                 `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${redirectURI}`
             );
@@ -446,7 +448,7 @@ app.get("/login", (req, res) => {
     console.log(`Code: ${code}`);
 
     {
-        const redirectURI = "http://localhost:3000";
+        const redirectURI = FRONTEND_URL;
         fetch(
             `https://github.com/login/oauth/access_token?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&code=${code}&redirect_uri=${redirectURI}`,
             {
@@ -470,8 +472,8 @@ app.get("/login", (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Listening on port ${PORT}`);
+app.listen(HTTP_PORT, () => {
+    console.log(`Listening on port ${HTTP_PORT}`);
 });
 
 // type ExtractMethodNames<T> = { [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never }[keyof T];
