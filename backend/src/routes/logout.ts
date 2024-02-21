@@ -1,0 +1,14 @@
+import { Express, Request, Response } from "express";
+import { resError } from "../app";
+import db, * as DB from "../db";
+import * as wss from "../websocketServer";
+import { WebsocketMessage } from "@react-messenger/shared";
+
+export default function (req: Request, res: Response) {
+    res.status(200)
+        .setHeader(
+            "Set-Cookie",
+            `accessToken=deleted; Path=/; Max-Age=0; HttpOnly; SameSite=None; Secure`
+        )
+        .send();
+}
