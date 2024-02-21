@@ -2,13 +2,14 @@ import { configDotenv } from "dotenv";
 import { Express, Request, Response } from "express";
 import { resError } from "../app";
 import db, * as DB from "../db";
-import * as wss from "../websocketServer";
+import * as wss from "../webSocketServer";
 import {
     PublicGithubUser,
     User,
     WebsocketMessage,
     FRONTEND_URL,
 } from "@react-messenger/shared";
+import sqlite3 from "sqlite3";
 
 configDotenv();
 const CLIENT_ID: string = process.env.CLIENT_ID!;
@@ -163,6 +164,8 @@ export default function (req: Request, res: Response) {
             })
             .then((data) => {
                 // FIXME: fix race condition (this fucking strict mode man...)
+                // perhaps have like a counter for a spec. handled code
+                // so to only send res if top counter is same as it was at start of req.
                 console.log(`>>>> `, data);
                 returnUser(data.access_token).then(() => {
                     console.log(`Code handled (${code})`);

@@ -1,7 +1,7 @@
 import { Express, Request, Response } from "express";
 import { resError } from "../app";
 import db, * as DB from "../db";
-import * as wss from "../websocketServer";
+import * as wss from "../webSocketServer";
 import { WebsocketMessage } from "@react-messenger/shared";
 
 export default function (req: Request, res: Response) {
@@ -16,12 +16,15 @@ export default function (req: Request, res: Response) {
     db.get(
         "SELECT login FROM Users WHERE access_token = ?",
         [accessToken],
-        function (err, { login: inviterLogin }: { login: string }) {
+        function (
+            err: Error | null,
+            { login: inviterLogin }: { login: string }
+        ) {
             if (err) return resError(res, 500);
             db.run(
                 "DELETE FROM FriendInvitations WHERE invitee_login = ? AND inviter_login = ?",
                 [inviteeLogin, inviterLogin],
-                function (err) {
+                function (err: Error | null) {
                     if (err) return resError(res, 500);
                     res.status(200).send();
 
@@ -30,7 +33,7 @@ export default function (req: Request, res: Response) {
                         "SELECT access_token FROM Users WHERE login = ?",
                         [inviteeLogin],
                         function (
-                            err,
+                            err: Error | null,
                             {
                                 access_token: inviteeAccessToken,
                             }: { access_token: string }

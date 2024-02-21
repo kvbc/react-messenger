@@ -2,7 +2,7 @@ import express, { Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { BackendResponseError, FRONTEND_URL } from "@react-messenger/shared";
-import * as wss from "./websocketServer";
+import * as webSocketServer from "./webSocketServer";
 import * as httpsServer from "./httpsServer";
 import routeAcceptFriendInvite from "./routes/acceptFriendInvite";
 import routeRejectFriendInvite from "./routes/rejectFriendInvite";
@@ -12,6 +12,7 @@ import routeLogout from "./routes/logout";
 import routeLogin from "./routes/login";
 
 const app = express();
+app.use(cookieParser());
 app.use(
     cors({
         credentials: true,
@@ -20,7 +21,6 @@ app.use(
         allowedHeaders: "Set-Cookie",
     })
 );
-app.use(cookieParser());
 
 app.get("/acceptFriendInvite", routeAcceptFriendInvite);
 app.get("/rejectFriendInvite", routeRejectFriendInvite);
@@ -30,7 +30,7 @@ app.get("/logout", routeLogout);
 app.get("/login", routeLogin);
 
 const server = httpsServer.init(app);
-wss.init(server);
+webSocketServer.init(server);
 
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 export function resError(
