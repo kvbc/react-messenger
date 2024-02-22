@@ -1,4 +1,4 @@
-import sqlite3, { Database } from "sqlite3";
+import sqlite3 from "sqlite3";
 
 sqlite3.verbose();
 
