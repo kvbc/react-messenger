@@ -1,5 +1,5 @@
 import { Express, Request, Response } from "express";
-import { resError } from "../app";
+import { sendResError } from "../httpsServer";
 import db, * as DB from "../db";
 import * as wss from "../webSocketServer";
 import { WebsocketMessage } from "@react-messenger/shared";
@@ -7,22 +7,22 @@ import { WebsocketMessage } from "@react-messenger/shared";
 export default function (req: Request, res: Response) {
     const inviterLogin = req.query.login;
     if (typeof inviterLogin !== "string")
-        return resError(res, 500, "Missing login query");
+        return sendResError(res, 500, "Missing login query");
 
     const accessToken = req.cookies.accessToken;
     if (typeof accessToken !== "string")
-        return resError(res, 500, "Missing access token");
+        return sendResError(res, 500, "Missing access token");
 
     db.get(
         "SELECT login FROM Users WHERE access_token = ?",
         [accessToken],
         function (err: Error | null, inviteeRow: DB.UsersRow) {
-            if (err) return resError(res, 500);
+            if (err) return sendResError(res, 500);
             db.run(
                 "DELETE FROM FriendInvitations WHERE inviter_login = ? AND invitee_login = ?",
                 [inviterLogin, inviteeRow.login],
                 function (err: Error | null) {
-                    if (err) return resError(res, 500, "No invite");
+                    if (err) return sendResError(res, 500, "No invite");
                     res.status(200).send();
 
                     db.get(

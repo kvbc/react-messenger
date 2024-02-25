@@ -1,5 +1,5 @@
 import { Express, Request, Response } from "express";
-import { resError } from "../app";
+import { sendResError } from "../httpsServer";
 import db, * as DB from "../db";
 import * as wss from "../webSocketServer";
 import { WebsocketMessage } from "@react-messenger/shared";

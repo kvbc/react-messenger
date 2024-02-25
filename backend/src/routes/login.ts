@@ -1,6 +1,6 @@
 import { configDotenv } from "dotenv";
 import { Express, Request, Response } from "express";
-import { resError } from "../app";
+import { sendResError } from "../httpsServer";
 import db, * as DB from "../db";
 import * as wss from "../webSocketServer";
 import {
@@ -37,7 +37,7 @@ export default function (req: Request, res: Response) {
         return fetchGithubUserFromAccessToken(accessToken).then(
             (ghUser: PublicGithubUser | null) => {
                 if (ghUser === null)
-                    return resError(
+                    return sendResError(
                         res,
                         500,
                         "Could not fetch user from access token"
@@ -62,7 +62,7 @@ export default function (req: Request, res: Response) {
                     "SELECT invitee_login FROM FriendInvitations WHERE inviter_login = ?",
                     [user.login],
                     function (err, rows: { invitee_login: string }[]) {
-                        if (err) return resError(res, 500);
+                        if (err) return sendResError(res, 500);
                         rows.forEach((row) => {
                             user.pendingFriendInvites.push(row.invitee_login);
                         });
@@ -76,7 +76,7 @@ export default function (req: Request, res: Response) {
                         err: Error | null,
                         rows: DB.FriendInvitationsRow[]
                     ) {
-                        if (err) return resError(res, 500);
+                        if (err) return sendResError(res, 500);
                         rows.forEach((row) => {
                             console.log(`invite from: ${row.inviter_login}`);
                             user.friendInvitations.push(row.inviter_login);
@@ -85,7 +85,7 @@ export default function (req: Request, res: Response) {
                             "SELECT friend_login FROM Friends WHERE friends_with_login = ?",
                             [user.login],
                             function (err, rows: DB.FriendsRow[]) {
-                                if (err) return resError(res, 500);
+                                if (err) return sendResError(res, 500);
                                 rows.forEach((row) => {
                                     console.log(`friend: ${row.friend_login}`);
                                     user.friends.push(row.friend_login);
@@ -94,7 +94,7 @@ export default function (req: Request, res: Response) {
                                     "SELECT friends_with_login FROM Friends WHERE friend_login = ?",
                                     [user.login],
                                     function (err, rows: DB.FriendsRow[]) {
-                                        if (err) return resError(res, 500);
+                                        if (err) return sendResError(res, 500);
                                         rows.forEach((row) => {
                                             console.log(
                                                 `friend: ${row.friends_with_login}`
@@ -129,7 +129,7 @@ export default function (req: Request, res: Response) {
 
     if (code == null) {
         if (noRedirect === "true") {
-            resError(res, 500, "case no. 1", false);
+            sendResError(res, 500, "case no. 1", false);
         } else {
             const redirectURI = FRONTEND_URL;
             res.redirect(
@@ -139,9 +139,9 @@ export default function (req: Request, res: Response) {
         return;
     }
 
-    if (typeof code !== "string") return resError(res, 500);
+    if (typeof code !== "string") return sendResError(res, 500);
     if (handledAccessCodes.includes(code))
-        return resError(res, 500, "case no. 2", false);
+        return sendResError(res, 500, "case no. 2", false);
     // handledAccessCodes.push(code);
     console.log(`Code: ${code}`);
 
@@ -172,6 +172,6 @@ export default function (req: Request, res: Response) {
                     handledAccessCodes.push(code);
                 });
             })
-            .catch((err) => resError(res, 500));
+            .catch((err) => sendResError(res, 500));
     }
 }

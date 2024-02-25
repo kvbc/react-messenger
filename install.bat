@@ -1,2 +1,2 @@
 @ECHO OFF
-FOR %%d IN (shared backend frontend) DO CD %%d & npm run install-link & CD ..
+FOR %%d IN (shared frontend backend) DO CD %%d & npm run install-link & CD ..

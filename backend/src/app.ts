@@ -31,16 +31,3 @@ app.get("/login", routeLogin);
 
 const server = httpsServer.init(app);
 webSocketServer.init(server);
-
-// https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
-export function resError(
-    res: Response,
-    statusCode: number,
-    message: string | null = null,
-    retry: boolean = true
-): null {
-    const json: BackendResponseError = { message, retry };
-    console.error(`[Error ${statusCode}] ${json.message} ${json.retry}`);
-    res.status(statusCode).json(json);
-    return null;
-}

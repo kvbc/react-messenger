@@ -2,73 +2,114 @@ import { Express, Request, Response } from "express";
 import db, * as DB from "../db";
 import { WebsocketMessage } from "@react-messenger/shared";
 import * as wss from "../webSocketServer";
-import { resError } from "../app";
+import {
+    getRequestCookie,
+    getRequestQuery,
+    sendResError,
+} from "../httpsServer";
 
-export default function (req: Request, res: Response) {
-    const inviterLogin = req.query.login;
-    if (typeof inviterLogin !== "string")
-        return resError(res, 500, "Missing login query");
+export default async function (req: Request, res: Response) {
+    const inviterLogin = getRequestQuery(req, res, "login");
+    if (!inviterLogin) return;
 
-    const accessToken = req.cookies.accessToken;
-    if (typeof accessToken !== "string")
-        return resError(res, 500, "Missing access token");
+    const inviteeAccessToken = getRequestCookie(req, res, "accessToken");
+    if (!inviteeAccessToken) return;
 
-    console.log(`accept mr. ${inviterLogin}`);
+    try {
+        //
+        // Fetch invitee login from access token
+        //
 
-    db.get(
-        "SELECT login FROM Users WHERE access_token = ?",
-        [accessToken],
-        function (err: Error | null, inviteeRow: DB.UsersRow) {
-            if (err) return resError(res, 500);
-            db.run(
-                "DELETE FROM FriendInvitations WHERE inviter_login = ? AND invitee_login = ?",
-                [inviterLogin, inviteeRow.login],
-                function (err: Error | null) {
-                    if (err) return resError(res, 500, "No invite");
-                    db.run(
-                        "INSERT INTO Friends(id, friend_login, friends_with_login) VALUES(NULL, ?, ?)",
-                        [inviteeRow.login, inviterLogin],
-                        function (err: Error | null) {
-                            if (err) return resError(res, 500);
-                            res.status(200).send();
-
-                            db.get(
-                                "SELECT access_token FROM Users WHERE login = ?",
-                                [inviterLogin],
-                                function (
-                                    err: Error | null,
-                                    inviterRow: DB.UsersRow
-                                ) {
-                                    if (err) return;
-                                    // send to invitee
-                                    {
-                                        const ws = wss.connections[accessToken];
-                                        if (!ws) return;
-                                        const msg: WebsocketMessage = {
-                                            event: "accepted",
-                                            login: inviterLogin,
-                                        };
-                                        ws.send(JSON.stringify(msg));
-                                    }
-                                    // send to inviter
-                                    {
-                                        const ws =
-                                            wss.connections[
-                                                inviterRow.access_token
-                                            ];
-                                        if (!ws) return;
-                                        const msg: WebsocketMessage = {
-                                            event: "accepted_by",
-                                            login: inviteeRow.login,
-                                        };
-                                        ws.send(JSON.stringify(msg));
-                                    }
-                                }
-                            );
-                        }
+        let inviteeLogin: string = "";
+        await DB.get<Pick<DB.UsersRow, "login">>(
+            "SELECT login FROM Users WHERE access_token = ?",
+            [inviteeAccessToken],
+            function (err: Error | null, { login }) {
+                if (err)
+                    throw sendResError(
+                        res,
+                        500,
+                        `Cannot fetch invitee login from access token`
                     );
+                inviteeLogin = login;
+            }
+        );
+
+        console.log(
+            `"${inviteeLogin}" accepts friend invite from "${inviterLogin}"`
+        );
+
+        //
+        // Delete friend invite from the inviter
+        //
+
+        await DB.run(
+            "DELETE FROM FriendInvitations WHERE inviter_login = ? AND invitee_login = ?",
+            [inviterLogin, inviteeLogin],
+            function (err: Error | null) {
+                if (err)
+                    throw sendResError(
+                        res,
+                        500,
+                        `No friend invite found from "${inviterLogin}"`
+                    );
+            }
+        );
+
+        //
+        // Add the inviter to friends
+        //
+
+        await DB.run(
+            "INSERT INTO Friends(id, friend_login, friends_with_login) VALUES(NULL, ?, ?)",
+            [inviteeLogin, inviterLogin],
+            function (err: Error | null) {
+                if (err)
+                    throw sendResError(
+                        res,
+                        500,
+                        `Already friends with ${inviterLogin}`
+                    );
+            }
+        );
+
+        res.sendStatus(200);
+
+        //
+        // Notify both the inviter and invitee through WebSockets
+        //
+
+        db.get<Pick<DB.UsersRow, "access_token">>(
+            "SELECT access_token FROM Users WHERE login = ?",
+            [inviterLogin],
+            function (err: Error | null, { access_token: inviterAccessToken }) {
+                if (err)
+                    return console.error(
+                        `Cannot fetch access token from inviter login (${inviterLogin})`
+                    );
+                // send to invitee
+                {
+                    const ws = wss.connections[inviteeAccessToken];
+                    if (!ws) return;
+                    const msg: WebsocketMessage = {
+                        event: "accepted",
+                        login: inviterLogin,
+                    };
+                    ws.send(JSON.stringify(msg));
                 }
-            );
-        }
-    );
+                // send to inviter
+                {
+                    const ws = wss.connections[inviterAccessToken];
+                    if (!ws) return;
+                    const msg: WebsocketMessage = {
+                        event: "accepted_by",
+                        login: inviteeLogin,
+                    };
+                    ws.send(JSON.stringify(msg));
+                }
+            }
+        );
+    } catch (err) {
+        console.error(err);
+    }
 }

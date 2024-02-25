@@ -29,6 +29,40 @@ db.serialize(() => {
     `);
 });
 
+function newPromise(
+    dbMethod: Function,
+    sql: string,
+    params: any,
+    callback: Function
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        dbMethod(sql, params, function (this: any, ...args: any[]) {
+            try {
+                callback.call(this, ...args);
+                resolve();
+            } catch (err) {
+                reject();
+            }
+        });
+    });
+}
+
+export function get<rowT>(
+    sql: string,
+    params: any,
+    callback: (this: sqlite3.Statement, err: Error | null, row: rowT) => void
+): Promise<void> {
+    return newPromise(db.get.bind(db), sql, params, callback);
+}
+
+export function run(
+    sql: string,
+    params: any,
+    callback: (this: sqlite3.RunResult, err: Error | null) => void
+): Promise<void> {
+    return newPromise(db.run.bind(db), sql, params, callback);
+}
+
 export type UsersRow = { login: string; access_token: string };
 export type FriendsRow = {
     id: number;
