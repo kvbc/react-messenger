@@ -29,5 +29,5 @@ app.get("/inviteFriend", routeInviteFriend);
 app.get("/logout", routeLogout);
 app.get("/login", routeLogin);
 
-const server = httpsServer.init(app);
-webSocketServer.init(server);
+const server = httpsServer.start(app);
+webSocketServer.start(server);

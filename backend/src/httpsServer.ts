@@ -7,7 +7,7 @@ export type Cookies = {
     accessToken: string;
 };
 
-export function init(app: Express): https.Server {
+export function start(app: Express): https.Server {
     return https
         .createServer(
             {

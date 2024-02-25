@@ -4,21 +4,35 @@ import https from "node:https";
 
 export const connections: { [accessToken: string]: WebSocket | undefined } = {};
 
-export function init(server: https.Server) {
+export function start(server: https.Server) {
     const wss = new WebSocketServer({ server });
     wss.on("connection", (ws, req) => {
         console.log("[WS] new connection");
 
-        ws.onerror = console.error;
-
-        if (req.headers.cookie == null) return ws.close();
+        if (!req.headers.cookie) {
+            console.error("=> no Cookie header");
+            ws.close();
+            return;
+        }
 
         const cookies = cookie.parse(req.headers.cookie);
         const accessToken: string | undefined = cookies.accessToken;
-        if (!accessToken) return ws.close();
+        if (!accessToken) {
+            console.error("=> no accessToken cookie");
+            ws.close();
+            return;
+        }
 
-        connections[accessToken] = ws;
+        const onopen = () => {
+            console.log("[WS] connection open");
+            connections[accessToken] = ws;
+        };
+
+        ws.onerror = console.error;
+        ws.onopen = onopen;
+        if (ws.readyState === ws.OPEN) onopen();
         ws.onclose = () => {
+            console.log("[WS] connection closed");
             delete connections[accessToken];
         };
     });
